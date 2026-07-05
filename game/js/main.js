@@ -379,7 +379,7 @@ class Game {
         document.getElementById('hud-timer').textContent = `${Math.floor(this.deepDepth)}m`;
         document.getElementById('hud-score').textContent = `❤ ${this.deepLife}`;
       } else {
-        this.ui.updateHUD(this.sim.time, this.sim.score, this.level.passTarget, this.sim.cooldownProgress(), this.pendingShark);
+        this.ui.updateHUD(this.sim.time, this.sim.score, this.level.passTarget, this.sim.cooldownProgress(), this.pendingShark, this.level.duration);
       }
     }
     this.debug.frame(dt, this.render, inGame ? this.sim : null);

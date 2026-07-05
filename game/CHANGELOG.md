@@ -2,6 +2,10 @@
 
 All notable changes to Fish Friends.
 
+## [1.11.0] — 2026-07-05
+- **Level 1 is now 45 seconds** (down from 60). Level duration is now per-level
+  (spawn window and pass targets scale with it); all other levels remain 60s.
+
 ## [1.10.0] — 2026-07-05
 - **Auto-updating + offline:** the service worker is now **network-first** — every
   time you open the game online it pulls the freshest version (no more manual hard

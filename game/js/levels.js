@@ -90,6 +90,7 @@ function buildLevelDefs() {
       maxDistinct: Math.min(3, Math.max(1, colors - 1)),
       specials: specialsFor(n),
       newThing: isIntroLevel(n),
+      duration: n === 1 ? 45 : undefined, // Level 1 is a shorter 45s tutorial
     };
     defs.push(def);
   }
@@ -119,6 +120,10 @@ export function compileLevel(def) {
   const picker = pickerFor(pool);
   const lanes = def.lanes;
   const spawns = [];
+  // Per-level duration (default = global). Spawns end ~10s before the clock so
+  // stragglers can resolve.
+  const duration = def.duration || LEVEL.duration;
+  const spawnWindow = def.spawnWindow || Math.max(10, duration - 10);
 
   // Special budget to inject across the level.
   const specialsLeft = {
@@ -134,12 +139,12 @@ export function compileLevel(def) {
   let t = 2.5; // first spawn
   let rowIndex = 0;
   // Spread specials evenly across the level's expected rows (keeps the tail empty).
-  const estRows = Math.max(6, Math.floor(LEVEL.spawnWindow / def.minGap));
+  const estRows = Math.max(6, Math.floor(spawnWindow / def.minGap));
   const specialEveryRows = totalSpecials > 0
     ? Math.max(2, Math.floor(estRows / (totalSpecials + 1)))
     : Infinity;
 
-  while (t < LEVEL.spawnWindow) {
+  while (t < spawnWindow) {
     const rowFish = buildContiguousRow(rng, lanes, def, pool);
     // Maybe convert the first fish in this row into a special.
     let injectedSpecial = null;
@@ -167,7 +172,7 @@ export function compileLevel(def) {
   }
 
   // Any specials not yet injected: append as spaced singles before window close.
-  let tailT = Math.min(t, LEVEL.spawnWindow - 6);
+  let tailT = Math.min(t, spawnWindow - 6);
   for (const kind of ['white', 'black', 'tri']) {
     while (specialsLeft[kind] > 0) {
       const lane = rng.int(0, lanes - 1);
@@ -175,7 +180,7 @@ export function compileLevel(def) {
       spawns.push(s);
       specialsLeft[kind]--;
       tailT += Math.max(def.minGap, launchesOf(kind) * cooldownFor(1) / LEVEL.apmGuardPct);
-      if (tailT > LEVEL.spawnWindow) tailT = LEVEL.spawnWindow - 1;
+      if (tailT > spawnWindow) tailT = spawnWindow - 1;
     }
   }
 
@@ -199,7 +204,7 @@ export function compileLevel(def) {
   const twoStar = Math.ceil(maxScore * LEVEL.twoStarPct);
   const threeStar = Math.ceil(maxScore * LEVEL.threeStarPct);
 
-  return { n: def.n, lanes, pool, picker: finalPicker, spawns, maxScore, passTarget, twoStar, threeStar, seed: def.seed };
+  return { n: def.n, lanes, pool, picker: finalPicker, spawns, maxScore, passTarget, twoStar, threeStar, seed: def.seed, duration, spawnWindow };
 }
 
 function pickRowLanes(rng, laneCount, sizeMin, sizeMax) {

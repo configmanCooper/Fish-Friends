@@ -251,9 +251,11 @@ function testLevelValidator() {
     const lvl = compileLevel(def);
     ok(lvl.maxScore > 0, `L${def.n} maxScore > 0`);
     eq(lvl.passTarget, Math.ceil(lvl.maxScore * 0.5), `L${def.n} passTarget = 50%`);
-    // spawn window
+    // spawn window (per-level)
     const lastT = lvl.spawns[lvl.spawns.length - 1].t;
-    ok(lastT <= LEVEL.spawnWindow + 0.001, `L${def.n} last spawn <= ${LEVEL.spawnWindow}s (got ${lastT.toFixed(1)})`);
+    ok(lastT <= lvl.spawnWindow + 0.001, `L${def.n} last spawn <= ${lvl.spawnWindow}s (got ${lastT.toFixed(1)})`);
+    // spawns must resolve before the level clock ends
+    ok(lvl.spawnWindow <= lvl.duration, `L${def.n} spawnWindow within duration`);
     // colors used subset of declared
     for (const s of lvl.spawns) {
       if (s.kind === 'normal') ok(lvl.pool.includes(s.color), `L${def.n} color in pool`);
@@ -280,8 +282,8 @@ function testLevelValidator() {
     for (const s of lvl.spawns) { (byT[s.t.toFixed(3)] ||= []).push(s); }
     let totalCost = 0;
     for (const key in byT) totalCost += rowLaunchTime(byT[key]);
-    ok(totalCost <= LEVEL.apmGuardPct * LEVEL.duration + 0.001,
-      `L${def.n} required launch time ${totalCost.toFixed(1)}s <= ${(LEVEL.apmGuardPct * LEVEL.duration).toFixed(1)}s`);
+    ok(totalCost <= LEVEL.apmGuardPct * lvl.duration + 0.001,
+      `L${def.n} required launch time ${totalCost.toFixed(1)}s <= ${(LEVEL.apmGuardPct * lvl.duration).toFixed(1)}s`);
   }
 }
 

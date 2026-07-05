@@ -273,8 +273,9 @@ export class UI {
     }
   }
 
-  updateHUD(time, score, target, cooldown, pendingShark) {
-    const remain = Math.max(0, LEVEL.duration - time);
+  updateHUD(time, score, target, cooldown, pendingShark, duration) {
+    const total = duration || LEVEL.duration;
+    const remain = Math.max(0, total - time);
     const mm = Math.floor(remain / 60), ss = Math.floor(remain % 60);
     const timer = document.getElementById('hud-timer');
     timer.textContent = `${mm}:${ss.toString().padStart(2, '0')}`;

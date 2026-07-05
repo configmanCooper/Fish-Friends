@@ -346,7 +346,7 @@ export class Sim {
 
   checkEnd() {
     if (this.endless) return; // Game controls endless termination (life-based)
-    const timeUp = this.time >= LEVEL.duration;
+    const timeUp = this.time >= (this.level.duration || LEVEL.duration);
     const cleared = this.allSpawned() && this.enemies.length === 0;
     if (timeUp || cleared) {
       this.ended = true;
