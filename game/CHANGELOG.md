@@ -2,6 +2,13 @@
 
 All notable changes to Fish Friends.
 
+## [1.17.0] — 2026-07-05
+- **Softer fish eyes:** eyes are now the fish's own colour, just slightly darker
+  (no more creepy black dots).
+- **Codes screen:** Settings has a **Codes** button that opens a code-entry
+  screen — typing **`fish`** turns on god mode.
+- **New app icon:** two opposite-coloured fish arranged like a yin-yang.
+
 ## [1.16.0] — 2026-07-05
 - **New shark model:** a great-white-style shark — torpedo body with a pointed
   snout and broad shoulders, big swept pectoral fins, dorsal and pelvic fins, a

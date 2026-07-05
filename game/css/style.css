@@ -157,6 +157,14 @@ html, body {
   padding: var(--s-2) 0; font-size: 16px; }
 .set-row input { width: 24px; height: 24px; }
 
+/* codes screen */
+.code-input { width: 100%; max-width: 260px; margin: var(--s-2) 0; padding: 12px 14px;
+  font-size: 18px; text-align: center; border-radius: var(--r-2); border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(0,0,0,0.3); color: var(--c-ink); pointer-events: auto; }
+.code-input:focus { outline: none; border-color: var(--c-accent); }
+.code-msg { min-height: 20px; font-size: 14px; margin-bottom: var(--s-2); }
+.code-msg.good { color: var(--c-good); } .code-msg.bad { color: var(--c-danger); }
+
 /* overlays */
 .overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
   background: rgba(2,12,22,0.75); z-index: var(--z-overlay); }

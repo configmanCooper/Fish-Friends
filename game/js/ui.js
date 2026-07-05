@@ -3,7 +3,7 @@ import { COLORS } from './config.js';
 import { POWERUPS, INV_CAP, LEVEL, DEEP, COOLDOWN_ENABLED } from './config.js';
 import { LEVELS } from './levels.js';
 
-const SCREENS = ['title', 'map', 'prelevel', 'game', 'results', 'shop', 'settings'];
+const SCREENS = ['title', 'map', 'prelevel', 'game', 'results', 'shop', 'settings', 'codes'];
 
 // Starfish icon (inline SVG) — the game's currency & level rating.
 // Chunky rounded 5-armed sea-star (fat quadratic-bezier arms) with bump spots.
@@ -118,6 +118,18 @@ export class UI {
           <label class="set-row"><span>Auto-deploy shark near bottom</span><input type="checkbox" data-setting="autoShark"></label>
           <button class="btn btn-danger" data-action="wipe-data">🗑️ Delete All Data</button>
           <button class="btn btn-primary" data-action="back-map">Done</button>
+          <button class="btn btn-small" data-action="open-codes">Codes</button>
+        </div>
+      </div>
+
+      <div class="screen" id="s-codes">
+        <div class="card">
+          <div class="card-level">Enter a Code</div>
+          <div class="card-target">Type a secret code and hit Enter.</div>
+          <input type="text" id="code-input" class="code-input" placeholder="code…" autocomplete="off" autocapitalize="none" spellcheck="false">
+          <div class="code-msg" id="code-msg"></div>
+          <button class="btn btn-primary" data-action="submit-code">Enter</button>
+          <button class="btn btn-small" data-action="settings">Back</button>
         </div>
       </div>
 
@@ -145,6 +157,11 @@ export class UI {
       const s = e.target.closest('[data-setting]');
       if (s) this.game.setSetting(s.dataset.setting, s.checked);
     });
+    this.root.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.target && e.target.id === 'code-input') {
+        e.preventDefault(); this.game.submitCode(e.target.value);
+      }
+    });
   }
 
   _action(a, el) {
@@ -155,6 +172,8 @@ export class UI {
       case 'title': g.goToTitle(); break;
       case 'deep': g.startDeep(); break;
       case 'settings': g.openSettings(); break;
+      case 'open-codes': g.openCodes(); break;
+      case 'submit-code': g.submitCode(document.getElementById('code-input').value); break;
       case 'shop': g.openShop(); break;
       case 'back-map': g.goToMap(); break;
       case 'start-level': g.openPreLevel(+el.dataset.level); break;

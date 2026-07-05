@@ -296,10 +296,10 @@ export class Render3D {
             float mask = texture2D(uPattern, uv2).a;
             diffuseColor.rgb *= (1.0 - mask * 0.55);
           }
-          // two dark eyes near the head on the dorsal side
+          // two eyes near the head — the fish's own colour, just a little darker
           float _e = min(length((vUvF - vec2(0.17, 0.84)) * vec2(1.0, 0.5)),
                          length((vUvF - vec2(0.33, 0.84)) * vec2(1.0, 0.5)));
-          diffuseColor.rgb *= mix(1.0, 0.1, smoothstep(0.05, 0.03, _e));`);
+          diffuseColor.rgb *= mix(1.0, 0.62, smoothstep(0.05, 0.03, _e));`);
     };
     this.fishMat = mat;
     this.fishMesh = new THREE.InstancedMesh(geo, mat, CAP);

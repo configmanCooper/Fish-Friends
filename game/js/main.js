@@ -127,6 +127,28 @@ class Game {
     location.reload();
   }
   openSettings() { this.ui.renderSettings(this.save.settings); this.ui.show('settings'); }
+  openCodes() {
+    const inp = document.getElementById('code-input');
+    if (inp) inp.value = '';
+    const msg = document.getElementById('code-msg');
+    if (msg) { msg.textContent = ''; msg.className = 'code-msg'; }
+    this.ui.show('codes');
+    if (inp) setTimeout(() => inp.focus(), 50);
+  }
+  submitCode(raw) {
+    const code = (raw || '').trim().toLowerCase();
+    const msg = document.getElementById('code-msg');
+    const show = (text, ok) => { if (msg) { msg.textContent = text; msg.className = 'code-msg ' + (ok ? 'good' : 'bad'); } };
+    if (code === 'fish') {
+      if (!this.godMode) this._toggleGod();
+      else this.ui.toast('God mode already on');
+      show('🐟 God mode activated!', true);
+    } else if (!code) {
+      show('Enter a code first.', false);
+    } else {
+      show('Unknown code.', false);
+    }
+  }
   openShop() { this.ui.renderShop(this.save, this.godMode); this.ui.show('shop'); }
 
   openPreLevel(n) {
