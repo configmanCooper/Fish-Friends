@@ -2,6 +2,11 @@
 
 All notable changes to Fish Friends.
 
+## [1.7.0] — 2026-07-05
+- **No draw cooldown:** you can now create fish as fast as you want — the launch
+  recharge is disabled and its bar is hidden. Levels re-paced accordingly (rows
+  spaced by their minimum gap); all 40 re-validated and still 3★-clearable.
+
 ## [1.6.0] — 2026-07-04
 - **Squid now scores:** the Giant Squid gives **+1 point for every 2 fish** it eats
   (was 0). Shark still eats every fish in its lanes for **full value**.

@@ -1,6 +1,6 @@
 // ui.js — DOM screens + HUD, one state machine. Reads/writes via the game object.
 import { COLORS } from './config.js';
-import { POWERUPS, INV_CAP, LEVEL, DEEP } from './config.js';
+import { POWERUPS, INV_CAP, LEVEL, DEEP, COOLDOWN_ENABLED } from './config.js';
 import { LEVELS } from './levels.js';
 
 const SCREENS = ['title', 'map', 'prelevel', 'game', 'results', 'shop', 'settings'];
@@ -282,8 +282,14 @@ export class UI {
     sc.textContent = `${score}/${target}`;
     sc.classList.toggle('gold', score >= target);
     const fill = document.getElementById('cooldown-fill');
-    fill.style.width = Math.round(cooldown * 100) + '%';
-    fill.classList.toggle('ready', cooldown >= 1);
+    // Cooldown disabled -> hide the recharge bar entirely.
+    if (COOLDOWN_ENABLED) {
+      fill.style.display = '';
+      fill.style.width = Math.round(cooldown * 100) + '%';
+      fill.classList.toggle('ready', cooldown >= 1);
+    } else {
+      fill.style.display = 'none';
+    }
     document.getElementById('cooldown-strip').classList.toggle('shark-mode', !!pendingShark);
   }
 

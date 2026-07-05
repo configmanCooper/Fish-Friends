@@ -68,15 +68,16 @@ export const SPEED = {
 
 // ---------------------------------------------------------------------------
 // Draw cooldown: launching starts a recharge of base + perFish * fishCount.
+// Disabled (0) — the player can draw fish as fast as they like.
 // ---------------------------------------------------------------------------
 export const COOLDOWN = {
-  base: 0.4,
-  perFish: 0.35,
-  // helper
+  base: 0,
+  perFish: 0,
 };
 export function cooldownFor(fishCount) {
   return COOLDOWN.base + COOLDOWN.perFish * Math.max(1, fishCount);
 }
+export const COOLDOWN_ENABLED = COOLDOWN.base > 0 || COOLDOWN.perFish > 0;
 
 // ---------------------------------------------------------------------------
 // Level rules.

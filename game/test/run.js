@@ -35,8 +35,13 @@ function testColors() {
 // 2. Cooldown formula.
 // ---------------------------------------------------------------------------
 function testCooldown() {
-  eq(cooldownFor(1), 0.75, 'cooldown 1 fish');
-  eq(Math.round(cooldownFor(3) * 100) / 100, 1.45, 'cooldown 3 fish');
+  // Cooldown is disabled — launching is always instant.
+  eq(cooldownFor(1), 0, 'cooldown disabled (1 fish)');
+  eq(cooldownFor(3), 0, 'cooldown disabled (3 fish)');
+  const lvl = makeLevel([{ t: 0.1, lane: 0, kind: 'normal', color: 'blue', value: 1 }]);
+  const sim = new Sim(lvl);
+  sim.launch([0], 'orange');
+  ok(sim.isReady(), 'ready immediately after launching (no wait)');
 }
 
 // ---------------------------------------------------------------------------
