@@ -131,65 +131,95 @@ export function buildTriGeometry() {
   return buildFishGeometry();
 }
 
-// A big shark facing +Y (up): long torpedo body, pointed snout, tall dorsal fin,
-// two pectoral fins and a forked caudal tail. ~1 unit tall before scaling.
-export function buildSharkGeometry() {
-  // Torpedo body.
-  const body = new THREE.SphereGeometry(0.5, 18, 12);
-  body.scale(0.34, 1.05, 0.36);
-  body.translate(0, 0.05, 0);
-
-  // Pointed snout at the front (+Y), overlapping the body so it connects.
-  const snout = new THREE.ConeGeometry(0.19, 0.55, 14);
-  snout.translate(0, 0.78, 0);
-  snout.scale(1.0, 1.0, 1.06);
-
-  // Tall dorsal fin on the back.
-  const dorsal = triGeo([
-    [[0, 0.15, 0.0], [0.02, 0.15, 0.30], [0.0, 0.72, 0.05]],
-  ]);
-  // Forked caudal tail fin (flat), bigger top lobe.
-  const tail = triGeo([
-    [[0, -0.55, 0], [0.40, -1.30, 0], [0, -0.86, 0]],
-    [[0, -0.55, 0], [0, -0.86, 0], [-0.30, -1.05, 0]],
-  ]);
-  // Pectoral fins.
-  const pecR = triGeo([[[0.28, 0.10, 0], [0.72, -0.20, 0], [0.30, -0.20, 0]]]);
-  const pecL = triGeo([[[-0.28, 0.10, 0], [-0.30, -0.20, 0], [-0.72, -0.20, 0]]]);
-
-  const geo = mergeGeoms([body, snout, dorsal, tail, pecR, pecL]);
-  geo.computeVertexNormals();
-  return geo;
+// Squid mantle: a long tapered tube, pointed at the top (posterior), widest in
+// the middle, narrowing to the head opening at the bottom.
+export function buildSquidMantle(wxFn, wzFn) {
+  const b = spindle(16, 14, -0.55, 0.95, wxFn, wzFn);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(new Float32Array(b.pos.length), 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
+  g.setIndex(b.idx);
+  g.computeVertexNormals();
+  return g;
 }
 
-// A giant squid / octopus: a wide, fairly flat mantle (head) with a spread fan
-// of shorter tentacles, so it can span the lanes without hanging to the bottom.
-export function buildSquidGeometry() {
-  const parts = [];
-  // Mantle / head dome (wide + flattish).
-  const head = new THREE.SphereGeometry(0.5, 20, 16);
-  head.scale(1.05, 0.62, 0.7);
-  head.translate(0, 0.3, 0);
-  parts.push(head);
-  // A brow ridge to make it read as a head.
-  const brow = new THREE.SphereGeometry(0.5, 16, 12);
-  brow.scale(0.8, 0.24, 0.5);
-  brow.translate(0, 0.52, 0.18);
-  parts.push(brow);
-  // Tentacles: a wide fan of short tapered prisms curling downward.
-  const N = 9;
-  for (let i = 0; i < N; i++) {
-    const t = (i / (N - 1) - 0.5); // -0.5..0.5
-    const x = t * 2.1;             // wide spread across the lanes
-    const tent = new THREE.ConeGeometry(0.12, 0.8, 8);
-    tent.rotateZ(Math.PI);        // point down
-    tent.scale(1.0, 1.0, 0.7);
-    tent.rotateZ(-t * 0.4);       // slight outward curl
-    tent.translate(x, -0.32, -0.05 + Math.abs(t) * 0.08);
-    parts.push(tent);
+// Reusable parametric spindle body -> {pos, uv, idx}. Head at +Y, tail at -Y.
+function spindle(NR, NS, yTail, yHead, wxFn, wzFn) {
+  const pos = [], uv = [], idx = [];
+  const cols = NS + 1;
+  for (let i = 0; i < NR; i++) {
+    const s = 0.05 + 0.9 * (i / (NR - 1));
+    const y = yTail + (yHead - yTail) * s;
+    const rx = wxFn(s), rz = wzFn(s);
+    for (let j = 0; j <= NS; j++) {
+      const a = (j / NS) * Math.PI * 2;
+      pos.push(Math.cos(a) * rx, y, Math.sin(a) * rz);
+      uv.push(j / NS, s);
+    }
   }
-  const geo = mergeGeoms(parts);
+  for (let i = 0; i < NR - 1; i++) {
+    for (let j = 0; j < NS; j++) {
+      const a = i * cols + j, b = a + cols;
+      idx.push(a, b, a + 1, a + 1, b, b + 1);
+    }
+  }
+  const tailIdx = pos.length / 3; pos.push(0, yTail - 0.02, 0); uv.push(0.5, 0);
+  const headIdx = pos.length / 3; pos.push(0, yHead + 0.04, 0); uv.push(0.5, 1);
+  const base = (NR - 1) * cols;
+  for (let j = 0; j < NS; j++) { idx.push(tailIdx, j + 1, j); idx.push(headIdx, base + j, base + j + 1); }
+  return { pos, uv, idx };
+}
+
+// A great-white-style shark facing +Y: torpedo body with a pointed snout and
+// broad "shoulders", big swept pectoral fins, a dorsal fin, small pelvic fins,
+// and a large forked caudal tail. Two-tone grey (dark back, pale margins) via
+// vertex colours; two dark eyes near the snout.
+export function buildSharkGeometry() {
+  const wx = (s) => 0.30 * Math.pow(Math.max(0, Math.sin(Math.PI * Math.pow(s, 1.35))), 0.75);
+  const wz = (s) => 0.22 * Math.pow(Math.max(0, Math.sin(Math.PI * Math.pow(s, 1.3))), 0.75);
+  const b = spindle(18, 14, -0.7, 0.82, wx, wz);
+  const body = new THREE.BufferGeometry();
+  body.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
+  body.setAttribute('normal', new THREE.Float32BufferAttribute(new Float32Array(b.pos.length), 3));
+  body.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
+  body.setIndex(b.idx);
+
+  // Big swept-back pectoral fins.
+  const pecR = triGeo([[[0.24, 0.30, 0.02], [0.95, -0.28, 0], [0.30, -0.12, 0.02]]]);
+  const pecL = triGeo([[[-0.24, 0.30, 0.02], [-0.30, -0.12, 0.02], [-0.95, -0.28, 0]]]);
+  // Small pelvic fins near the back.
+  const pelR = triGeo([[[0.16, -0.35, 0.01], [0.45, -0.62, 0], [0.18, -0.55, 0.01]]]);
+  const pelL = triGeo([[[-0.16, -0.35, 0.01], [-0.18, -0.55, 0.01], [-0.45, -0.62, 0]]]);
+  // Dorsal fin ridge on top.
+  const dorsal = triGeo([
+    [[-0.05, 0.20, 0.16], [0.05, 0.20, 0.16], [0.0, 0.30, 0.44]],
+  ]);
+  // Large forked caudal tail (upper lobe bigger).
+  const tail = triGeo([
+    [[0.06, -0.62, 0], [0.42, -1.42, 0], [0.02, -0.95, 0]],
+    [[-0.06, -0.62, 0], [-0.02, -0.95, 0], [-0.34, -1.16, 0]],
+    [[0.06, -0.62, 0], [0.02, -0.95, 0], [-0.06, -0.62, 0]],
+    [[-0.06, -0.62, 0], [0.02, -0.95, 0], [-0.02, -0.95, 0]],
+  ]);
+
+  const geo = mergeGeoms([body, pecR, pecL, pelR, pelL, dorsal, tail]);
   geo.computeVertexNormals();
+
+  // Two-tone vertex colours + dark eyes.
+  const pos = geo.attributes.position;
+  const colors = new Float32Array(pos.count * 3);
+  const back = new THREE.Color(0x54637a), pale = new THREE.Color(0xc9d2da), eye = new THREE.Color(0x14181f);
+  const tmp = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const t = Math.min(1, Math.max(0, (z + 0.16) / 0.34)); // pale belly/edges, dark back
+    tmp.copy(pale).lerp(back, t);
+    // eyes near the snout, on the dorsal side
+    if (y > 0.52 && z > 0.02 && Math.abs(x) > 0.05 && Math.abs(x) < 0.17) tmp.copy(eye);
+    colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   return geo;
 }
 

@@ -2,6 +2,16 @@
 
 All notable changes to Fish Friends.
 
+## [1.16.0] — 2026-07-05
+- **New shark model:** a great-white-style shark — torpedo body with a pointed
+  snout and broad shoulders, big swept pectoral fins, dorsal and pelvic fins, a
+  large forked tail, two-tone grey shading and dark eyes.
+- **New giant-squid model:** a proper squid — long tapered mantle with two
+  triangular posterior fins, a head with two big eyes, and a crown of arms plus
+  two long feeding tentacles.
+- **Squid grabs its prey:** when the squid eats a fish, the nearest arm whips out
+  toward it and drags the fish into the mouth.
+
 ## [1.15.0] — 2026-07-05
 - **Realistic fish model:** replaced the blobby fish with a proper spindle body
   (pointed head, wide middle, thin tail base), a forked caudal tail, swept

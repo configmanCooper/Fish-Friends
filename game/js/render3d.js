@@ -2,7 +2,7 @@
 // One instanced mesh for all normal/white/black/player fish; tri fish are a small
 // non-instanced group. Friend pairs swim off-screen together on a correct meeting.
 import * as THREE from './vendor/three.module.js';
-import { buildFishGeometry, buildTriGeometry, buildPatternAtlas, patternUvOffset, buildSharkGeometry, buildSquidGeometry } from './fish_models.js';
+import { buildFishGeometry, buildTriGeometry, buildPatternAtlas, patternUvOffset, buildSharkGeometry, buildSquidMantle } from './fish_models.js';
 import { ParticleFX, Floaters } from './fx.js';
 import { COLORS, SPEED, FIELD, ROW_YS, CORAL } from './config.js';
 
@@ -23,6 +23,15 @@ const _p = new THREE.Vector3();
 const _c = new THREE.Color();
 const _qUp = new THREE.Quaternion();       // player facing up (identity)
 const _qDown = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI); // enemy facing down
+
+// Flat-triangle mesh helper (for squid fins).
+function triGeoMesh(tri, mat) {
+  const g = new THREE.BufferGeometry();
+  const p = new Float32Array([tri[0][0], tri[0][1], tri[0][2], tri[1][0], tri[1][1], tri[1][2], tri[2][0], tri[2][1], tri[2][2]]);
+  g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+  g.computeVertexNormals();
+  return new THREE.Mesh(g, mat);
+}
 
 export class Render3D {
   constructor(canvas) {
@@ -114,19 +123,73 @@ export class Render3D {
     this.scene.add(group);
   }
 
-  _buildShark() {
-    this.sharkGeo = buildSharkGeometry();
-    this.sharkMat = new THREE.MeshLambertMaterial({ color: 0x8894a3, side: THREE.DoubleSide });
+  _buildShark() {    this.sharkGeo = buildSharkGeometry();
+    this.sharkMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     this.sharkMeshes = new Map(); // shark id -> mesh
   }
 
   _buildSquid() {
-    const geo = buildSquidGeometry();
-    const mat = new THREE.MeshLambertMaterial({ color: 0x9a4fd0, transparent: true, opacity: 0.82, side: THREE.DoubleSide });
-    this.squidMesh = new THREE.Mesh(geo, mat);
-    this.squidMesh.visible = false;
-    this.squidMesh.renderOrder = 3;
-    this.scene.add(this.squidMesh);
+    // Build the squid as a Group so its arms can be animated (grabbing fish).
+    const g = new THREE.Group();
+    const body = new THREE.Color(0x9a4fd0);
+    const bodyMat = new THREE.MeshLambertMaterial({ color: body, side: THREE.DoubleSide });
+    const eyeMat = new THREE.MeshLambertMaterial({ color: 0x1a1030 });
+
+    // Long tapered mantle: pointed at the top (posterior), opening at the head.
+    const wx = (s) => 0.34 * Math.pow(Math.max(0, Math.sin(Math.PI * Math.pow(s, 0.7))), 0.6);
+    const wz = (s) => 0.26 * Math.pow(Math.max(0, Math.sin(Math.PI * Math.pow(s, 0.7))), 0.6);
+    const mb = buildSquidMantle(wx, wz);
+    const mantle = new THREE.Mesh(mb, bodyMat);
+    g.add(mantle);
+
+    // Two triangular fins near the top (posterior) of the mantle.
+    for (const sgn of [1, -1]) {
+      const fin = triGeoMesh([[0, 0.72, 0], [sgn * 0.55, 0.95, 0], [sgn * 0.08, 0.42, 0]], bodyMat);
+      g.add(fin);
+    }
+    // Head bulge + two big eyes at the base of the mantle.
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.34, 16, 12), bodyMat);
+    head.scale.set(1.0, 0.7, 0.8); head.position.y = -0.5; g.add(head);
+    for (const sgn of [1, -1]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 10), eyeMat);
+      eye.position.set(sgn * 0.2, -0.46, 0.22); g.add(eye);
+    }
+
+    // Arms: 8 shorter arms + 2 long tentacles, hanging from the head. Kept in an
+    // array so we can bend them toward prey when the squid eats.
+    this.squidArms = [];
+    const armGeo = new THREE.CapsuleGeometry(0.05, 0.8, 3, 6);
+    const tentGeo = new THREE.CapsuleGeometry(0.045, 1.35, 3, 6);
+    const N = 8;
+    for (let i = 0; i < N; i++) {
+      const frac = (i / (N - 1) - 0.5);          // -0.5..0.5
+      const arm = new THREE.Mesh(armGeo, bodyMat);
+      const pivot = new THREE.Group();
+      pivot.position.set(frac * 0.34, -0.62, 0.05);
+      arm.position.y = -0.42;                     // hang below the pivot
+      pivot.rotation.z = -frac * 0.7;             // fan outward
+      pivot.add(arm);
+      pivot.userData = { rest: pivot.rotation.z, restLen: 1, x: frac * 0.34 };
+      g.add(pivot);
+      this.squidArms.push(pivot);
+    }
+    for (const sgn of [1, -1]) {                  // two long feeding tentacles
+      const t = new THREE.Mesh(tentGeo, bodyMat);
+      const pivot = new THREE.Group();
+      pivot.position.set(sgn * 0.12, -0.62, 0.02);
+      t.position.y = -0.72;
+      pivot.rotation.z = -sgn * 0.12;
+      pivot.add(t);
+      pivot.userData = { rest: pivot.rotation.z, restLen: 1, x: sgn * 0.12, long: true };
+      g.add(pivot);
+      this.squidArms.push(pivot);
+    }
+
+    g.visible = false;
+    g.renderOrder = 3;
+    this.squidGroup = g;
+    this.squidGrabs = [];   // active grab animations
+    this.scene.add(g);
   }
 
   _buildLights() {
@@ -310,6 +373,7 @@ export class Render3D {
         this.floaters.spawn(this.worldX(e.lane), this.worldY(0.5), 1, '+' + e.value);
       } else if (e.type === 'squidEat') {
         this.fx.spawn(this.worldX(e.lane), this.worldY(0.5), 0.5, 0x7a4fb0, { count: 10, speed: 0.6 });
+        this._squidGrab(e.lane);
         if (e.scored) this.floaters.spawn(this.worldX(e.lane), this.worldY(0.5), 1, '+1');
       } else if (e.type === 'wastePenalty') {
         this.fx.spawn(this.worldX(e.lane), this.worldY(0.98), 0.5, 0xff8a5a, { count: 10, up: 0.4, speed: 0.5 });
@@ -435,21 +499,76 @@ export class Render3D {
 
   _updateSquid(sim) {
     const active = sim && !sim.ended && sim.effects && sim.effects.squid.active;
-    this.squidMesh.visible = !!active;
-    if (!active) return;
+    this.squidGroup.visible = !!active;
+    if (!active) { this.squidGrabs.length = 0; return; }
     const laneW = this._laneW();
     const interior = Math.max(1, this.laneCount - 2);
-    // scale to span the interior lanes horizontally (geom is ~2.5 wide), capped.
-    const scale = Math.min((interior * laneW) / 2.5, 2.0);
-    // position so the tentacle tips (geom y ~ -0.72) stay above the bottom strip.
-    const TIP = 0.72;
-    const bottomLimit = H * 0.32;      // never reach into the seabed / draw strip
-    const posY = bottomLimit + TIP * scale;
-    this.squidMesh.position.set(0, posY, 1.5);
-    this.squidMesh.scale.setScalar(scale);
-    // gentle tentacle bob
-    this.squidMesh.rotation.z = Math.sin(this.time * 1.5) * 0.03;
-    this.squidMesh.position.y += Math.sin(this.time * 1.2) * 0.05;
+    const scale = Math.min((interior * laneW) / 2.6, 1.6);
+    // position the head/mouth near the eat line; mantle rises above, arms hang below.
+    const cx = 0;
+    const mouthY = this.worldY(sim.squidY);
+    const cy = mouthY + 0.5 * scale;
+    this.squidScale = scale;
+    this.squidMouth = mouthY;
+    this.squidGroup.position.set(cx, cy, 1.6);
+    this.squidGroup.scale.setScalar(scale);
+    this.squidGroup.rotation.z = Math.sin(this.time * 1.2) * 0.02;
+
+    // idle arm sway
+    for (const arm of this.squidArms) {
+      const sway = Math.sin(this.time * 2 + arm.userData.x * 6) * 0.08;
+      arm.rotation.z = arm.userData.rest + sway - (arm.userData.grab || 0);
+      arm.scale.y = 1 + (arm.userData.stretch || 0);
+    }
+
+    // advance active grabs: an arm whips toward the eaten fish, a little fish
+    // blob is dragged up into the mouth, then the arm relaxes.
+    for (const grab of this.squidGrabs) {
+      grab.t += 0.06;
+      const arm = grab.arm;
+      const reach = Math.sin(Math.min(Math.PI, grab.t * Math.PI)); // 0..1..0
+      // aim the arm's angle toward the prey x (in the group's local frame)
+      const localX = (grab.x - cx) / scale;
+      const aim = Math.atan2(localX - arm.userData.x, 1.2) * 0.9;
+      arm.userData.grab = (arm.userData.rest - aim) * reach;
+      arm.userData.stretch = reach * (arm.userData.long ? 0.5 : 0.35);
+      // drag the captured fish blob from its spot into the mouth
+      if (grab.blob) {
+        const p = Math.min(1, grab.t);
+        const my = this.squidMouth != null ? this.squidMouth : (cy - 0.4 * scale);
+        grab.blob.position.set(
+          grab.x + (cx - grab.x) * p,
+          grab.y + (my - grab.y) * p,
+          1.7);
+        grab.blob.scale.setScalar((1 - p) * 0.5 * scale + 0.05);
+        grab.blob.material.opacity = 1 - p;
+      }
+    }
+    // retire finished grabs
+    for (const grab of this.squidGrabs) {
+      if (grab.t >= 1 && grab.blob) { this.scene.remove(grab.blob); grab.blob.geometry.dispose(); grab.blob.material.dispose(); grab.blob = null; }
+    }
+    this.squidGrabs = this.squidGrabs.filter((g) => g.t < 1.05);
+    for (const arm of this.squidArms) { if (!this.squidGrabs.some((g) => g.arm === arm)) { arm.userData.grab = (arm.userData.grab || 0) * 0.8; arm.userData.stretch = (arm.userData.stretch || 0) * 0.8; } }
+  }
+
+  // Called on a squidEat event: start a grab animation for the eaten fish.
+  _squidGrab(lane) {
+    if (!this.squidArms || !this.squidArms.length) return;
+    const x = this.worldX(lane);
+    const y = this.worldY(0.62);
+    // choose the nearest free-ish arm to the prey lane
+    let best = this.squidArms[0], bestD = Infinity;
+    for (const arm of this.squidArms) {
+      const ax = this.squidGroup.position.x + arm.userData.x * (this.squidScale || 1);
+      const d = Math.abs(ax - x) + (this.squidGrabs.some((g) => g.arm === arm) ? 5 : 0);
+      if (d < bestD) { best = arm; bestD = d; }
+    }
+    const blob = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6),
+      new THREE.MeshBasicMaterial({ color: 0xbfe8ff, transparent: true, opacity: 1 }));
+    blob.position.set(x, y, 1.7);
+    this.scene.add(blob);
+    this.squidGrabs.push({ arm: best, x, y, t: 0, blob });
   }
 
   _writeInstances(sim) {
