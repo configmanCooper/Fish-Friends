@@ -1,0 +1,17 @@
+# dependencies (dev-only, for browser tests)
+node_modules/
+game/node_modules/
+
+# temp screenshots / diagnostics
+*.log
+smoke.png
+shark.png
+squid.png
+squid2.png
+orient.png
+shot_*.png
+sf_*.png
+
+# OS junk
+.DS_Store
+Thumbs.db

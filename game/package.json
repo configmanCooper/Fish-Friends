@@ -1,0 +1,10 @@
+{
+  "name": "fish-friends",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Fish Friends — opposite-color fish pairing game (HTML5 + three.js, no build step).",
+  "scripts": {
+    "test": "node test/run.js"
+  }
+}

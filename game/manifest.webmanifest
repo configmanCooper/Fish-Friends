@@ -1,0 +1,14 @@
+{
+  "name": "Fish Friends",
+  "short_name": "Fish Friends",
+  "description": "Match opposite-colored fish and send them swimming off together.",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#0a3a66",
+  "theme_color": "#0a3a66",
+  "icons": [
+    { "src": "favicon.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "favicon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

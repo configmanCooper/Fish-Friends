@@ -1,0 +1,367 @@
+// main.js — boot, Game controller, fixed-timestep loop. Wires all modules.
+import { TICK_DT, LEVEL, DEEP, POWERUPS, DEEP as DEEPCFG } from './config.js';
+import { LEVELS, compileLevel, compileDeepBase, deepChunk } from './levels.js';
+import { Sim } from './sim.js';
+import { Render3D } from './render3d.js';
+import { Input } from './input.js';
+import { UI } from './ui.js';
+import { buy as shopBuy } from './shop.js';
+import * as Save from './save.js';
+import * as Audio from './audio.js';
+import { Debug } from './debug.js';
+
+class Game {
+  constructor() {
+    this.save = Save.load();
+    this.canvas = document.getElementById('game-canvas');
+    this.render = new Render3D(this.canvas);
+    this.ui = new UI(document.getElementById('ui-root'), this);
+    this.input = new Input(this.canvas, this.render, this);
+    this.debug = new Debug();
+
+    this.state = 'title';
+    this.sim = null;
+    this.level = null;
+    this.levelN = 1;
+    this.selectedColor = null;
+    this.paused = false;
+    this.acc = 0;
+    this.lastT = performance.now();
+
+    // powerup placement
+    this.pendingShark = false;
+    this.sharkLane = 0;
+
+    // deep state
+    this.deep = false;
+    this.deepDepth = 0;
+    this.deepLife = 5;
+    this.deepNextChunk = 0;
+
+    // god mode (cheat): type "fish" while in a level
+    this.godMode = false;
+    this._cheatBuf = '';
+
+    this.ui.renderSettings(this.save.settings);
+    Audio.setEnabled(this.save.settings.sfx);
+    Audio.setMusicEnabled(this.save.settings.music);
+
+    this.ui.renderTitle(this.save, this.godMode);
+    this.ui.show('title');
+    this._rotateGate();
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && this.state === 'game' && !this.paused) this.pause();
+    });
+    window.addEventListener('pointerdown', () => Audio.unlock(), { once: true });
+    window.addEventListener('keydown', (e) => this._cheatKey(e));
+
+    requestAnimationFrame((t) => this._loop(t));
+  }
+
+  // Detect the "fish" cheat sequence anywhere -> toggle god mode.
+  _cheatKey(e) {
+    if (!e.key || e.key.length !== 1) return;
+    this._cheatBuf = (this._cheatBuf + e.key.toLowerCase()).slice(-4);
+    if (this._cheatBuf === 'fish') this._toggleGod();
+  }
+  _toggleGod() {
+    this.godMode = !this.godMode;
+    this.ui.toast(this.godMode
+      ? '🐟 GOD MODE — unlimited starfish + all levels'
+      : 'God mode off');
+    // reflect immediately on whichever screen is showing
+    if (this.state === 'map') this.ui.renderMap(this.save, this.godMode);
+    else if (this.state === 'shop') this.ui.renderShop(this.save, this.godMode);
+    else if (this.state === 'title') this.ui.renderTitle(this.save, this.godMode);
+  }
+
+  // ---- navigation --------------------------------------------------------
+  goToMap() {
+    this._stopPlay();
+    this.state = 'map';
+    Audio.playMusic('map');
+    this.ui.renderMap(this.save, this.godMode);
+    this.ui.show('map');
+  }
+  goToTitle() {
+    this._stopPlay();
+    this.state = 'title';
+    Audio.playMusic('map');
+    this.ui.renderTitle(this.save, this.godMode);
+    this.ui.show('title');
+  }
+  wipeData() {
+    const yes = (typeof confirm === 'function') ? confirm('Delete ALL progress, starfish and settings? This cannot be undone.') : true;
+    if (!yes) return;
+    Save.wipe();
+    location.reload();
+  }
+  openSettings() { this.ui.renderSettings(this.save.settings); this.ui.show('settings'); }
+  openShop() { this.ui.renderShop(this.save, this.godMode); this.ui.show('shop'); }
+
+  openPreLevel(n) {
+    this.levelN = n;
+    this.level = compileLevel(LEVELS[n - 1]);
+    this.state = 'prelevel';
+    this.ui.renderPreLevel(n, this.level);
+    this.ui.show('prelevel');
+  }
+
+  buyItem(kind) {
+    if (this.godMode) {
+      // unlimited starfish: grant the item free and ignore the stack cap
+      this.save.inventory[kind] = (this.save.inventory[kind] || 0) + 1;
+      Audio.sfx.buy(); Save.save(this.save); this.ui.renderShop(this.save, true);
+      return;
+    }
+    if (shopBuy(this.save, kind)) { Audio.sfx.buy(); Save.save(this.save); this.ui.renderShop(this.save); }
+  }
+
+  setSetting(key, val) {
+    this.save.settings[key] = val;
+    if (key === 'sfx') Audio.setEnabled(val);
+    if (key === 'music') { Audio.setMusicEnabled(val); if (val && this.state === 'map') Audio.playMusic('map'); }
+    if (key === 'mirror') this.ui.renderSettings(this.save.settings);
+    Save.save(this.save);
+  }
+
+  // ---- level lifecycle ---------------------------------------------------
+  beginLevel() {
+    this.deep = false;
+    this.sim = new Sim(this.level);
+    this.render.setLevel(this.level.lanes);
+    this.selectedColor = this.level.picker[0];
+    this.pendingShark = false;
+    this.acc = 0;
+    this.paused = false;
+    this.state = 'game';
+    this.ui.renderPicker(this.level, this.selectedColor);
+    this.ui.renderDock(this.save, null);
+    this.ui.show('game');
+    Audio.playMusic('game');
+  }
+
+  nextLevel() {
+    const n = Math.min(40, this.levelN + 1);
+    this.openPreLevel(n);
+  }
+  replayLevel() { this.openPreLevel(this.levelN); }
+
+  _endLevel(res) {
+    // starfish awarded = improvement over previous best stars for this level.
+    const prevBest = this.save.bestStars[this.levelN] || 0;
+    let earned = 0;
+    if (res.stars > prevBest) { earned = res.stars - prevBest; this.save.bestStars[this.levelN] = res.stars; }
+    if (res.passed && this.levelN >= this.save.furthestLevel && this.levelN < 40) {
+      this.save.furthestLevel = Math.min(40, this.levelN + 1);
+    }
+    if (res.passed && this.levelN === 40) this.save.furthestLevel = 41; // unlock deep
+    this.save.starfish += earned;
+    Save.save(this.save);
+    res.earned = earned;
+    this.state = 'results';
+    if (res.stars >= 1) Audio.sfx.star();
+    this.ui.renderResults(res);
+    this.ui.show('results');
+  }
+
+  // ---- The Deep ----------------------------------------------------------
+  startDeep() {
+    const deepUnlocked = this.godMode || this.save.furthestLevel > DEEPCFG.unlockLevel || this.save.bestStars[40];
+    if (!deepUnlocked) { this.ui.toast && this.ui.show('map'); return; }
+    this.level = compileDeepBase();
+    this.sim = new Sim(this.level, { endless: true });
+    this.render.setLevel(this.level.lanes);
+    this.selectedColor = this.level.picker[0];
+    this.deep = true;
+    this.deepDepth = 0;
+    this.deepLife = 5;
+    this.deepNextChunk = 0;
+    this.deepStarfishBanked = 0;
+    this.pendingShark = false;
+    this.acc = 0; this.paused = false;
+    this.state = 'game';
+    this.ui.renderPicker(this.level, this.selectedColor);
+    this.ui.renderDock(this.save, null);
+    this.ui.show('game');
+    Audio.playMusic('game');
+  }
+
+  _feedDeep() {
+    // ensure ~30s of spawns ahead of current time
+    while (this.deepNextChunk < this.sim.time + 30) {
+      const chunk = deepChunk(this.level.seed, this.deepNextChunk, this.deepDepth);
+      for (const s of chunk.spawns) this.sim.level.spawns.push(s);
+      this.level.speedMult = chunk.speedMult;
+      this.deepNextChunk += 30;
+    }
+  }
+
+  _endDeep() {
+    const meters = Math.floor(this.deepDepth);
+    const earned = Math.floor(meters / DEEPCFG.starfishPer);
+    if (meters > (this.save.bestDepth || 0)) this.save.bestDepth = meters;
+    this.save.starfish += earned;
+    Save.save(this.save);
+    this.deep = false;
+    this.state = 'results';
+    this.ui.renderResults({ passed: true, score: meters, maxScore: meters, stars: 3, earned });
+    document.getElementById('res-title').textContent = `The Deep — ${meters}m`;
+    document.getElementById('res-stars').textContent = `🌊 Depth ${meters}m`;
+    document.getElementById('res-next').textContent = 'Dive Again';
+    document.getElementById('res-next').dataset.action = 'deep';
+    this.ui.show('results');
+  }
+
+  // ---- input hooks -------------------------------------------------------
+  isPlaying() { return this.state === 'game' && this.sim && !this.sim.ended && !this.paused; }
+
+  selectColor(c) { this.selectedColor = c; this.ui.updatePickerSelection(c); }
+
+  tryLaunch(lanes) {
+    if (!this.isPlaying()) return;
+    const ok = this.sim.launch(lanes, this.selectedColor);
+    if (ok) Audio.sfx.launch(); else { Audio.sfx.deny(); this.ui.toast('Not yet — recharging'); }
+  }
+
+  useItem(kind) {
+    if (!this.isPlaying()) return;
+    if ((this.save.inventory[kind] || 0) <= 0) return;
+    if (kind === 'shark') {
+      if (this.pendingShark) { this.pendingShark = false; this.ui.toast('Shark cancelled'); return; }
+      this.pendingShark = true;
+      this.sharkLane = Math.floor(this.level.lanes / 2) - 1;
+      this.ui.toast('Drag on the seabed to aim the shark');
+      return;
+    }
+    this._consume(kind);
+    if (kind === 'ice') { this.sim.useIce(); Audio.sfx.squid(); }
+    if (kind === 'rainbow') { this.sim.useRainbow(); Audio.sfx.transform(); }
+    if (kind === 'squid') { this.sim.useSquid(); Audio.sfx.squid(); }
+  }
+
+  confirmShark() {
+    if (!this.pendingShark) return;
+    this.pendingShark = false;
+    this._consume('shark');
+    this.sim.useShark(this.sharkLane);
+    Audio.sfx.shark();
+  }
+
+  _consume(kind) {
+    this.save.inventory[kind] = Math.max(0, (this.save.inventory[kind] || 0) - 1);
+    Save.save(this.save);
+    this.ui.renderDock(this.save, null);
+  }
+
+  // ---- pause -------------------------------------------------------------
+  pause() { if (this.state === 'game') { this.paused = true; this.ui.showPause(); } }
+  async resume() {
+    this.ui.hidePause();
+    await this.ui.countdown();
+    this.paused = false;
+    this.lastT = performance.now();
+  }
+
+  _stopPlay() { this.paused = false; this.pendingShark = false; }
+
+  // Auto-deploy a shark in a lane when an enemy is within ~1s of the bottom,
+  // if the setting is on and the player has a shark in inventory.
+  _autoShark() {
+    if (!this.save.settings.autoShark) return;
+    const s = this.sim;
+    if (!s || s.ended) return;
+    if ((this.save.inventory.shark || 0) <= 0) return;
+    const covered = new Set();
+    for (const sh of s.sharks) for (const l of sh.lanes) covered.add(l);
+    for (const e of s.enemies) {
+      if ((this.save.inventory.shark || 0) <= 0) break;
+      if (!e.alive || covered.has(e.lane)) continue;
+      const spd = s.enemySpeed(e);
+      if (spd <= 0 || e.y <= 0) continue;
+      if (e.y / spd <= 1.0) {
+        s.useShark(e.lane - 1);
+        this.save.inventory.shark = Math.max(0, (this.save.inventory.shark || 0) - 1);
+        Save.save(this.save);
+        this.ui.renderDock(this.save, null);
+        Audio.sfx.shark();
+        const w = 3, l0 = Math.max(0, Math.min(e.lane - 1, s.lanes - w));
+        for (let i = 0; i < w; i++) covered.add(l0 + i);
+      }
+    }
+  }
+
+  // ---- loop --------------------------------------------------------------
+  _loop(now) {
+    requestAnimationFrame((t) => this._loop(t));
+    let dt = (now - this.lastT) / 1000;
+    this.lastT = now;
+    if (dt > 0.1) dt = 0.1;
+
+    const inGame = this.state === 'game';
+    if (inGame && !this.paused && this.sim) {
+      if (this.deep) this._feedDeep();
+      this.acc += dt;
+      let steps = 0;
+      while (this.acc >= TICK_DT && steps < 8) {
+        this.sim.tick(TICK_DT);
+        this.acc -= TICK_DT; steps++;
+        const events = this.sim.drainEvents();
+        this.render.handleEvents(events, this.sim);
+        this._audioForEvents(events);
+        if (this.deep) this._deepAccount(events);
+        const le = events.find((e) => e.type === 'levelEnd');
+        if (le && !this.deep) { this._endLevel(le); break; }
+      }
+      if (this.deep) {
+        this.deepDepth += dt * (DEEPCFG.metersPer30s / 30);
+        if (this.deepLife <= 0) this._endDeep();
+      }
+      this._autoShark();
+    }
+
+    this.render.update(dt, inGame && !this.paused ? this.sim : (inGame ? this.sim : null));
+
+    if (inGame && this.sim) {
+      if (this.deep) {
+        this.ui.updateHUD(0, Math.floor(this.deepDepth), this.deepLife, this.sim.cooldownProgress(), this.pendingShark);
+        document.getElementById('hud-timer').textContent = `${Math.floor(this.deepDepth)}m`;
+        document.getElementById('hud-score').textContent = `❤ ${this.deepLife}`;
+      } else {
+        this.ui.updateHUD(this.sim.time, this.sim.score, this.level.passTarget, this.sim.cooldownProgress(), this.pendingShark);
+      }
+    }
+    this.debug.frame(dt, this.render, inGame ? this.sim : null);
+  }
+
+  _deepAccount(events) {
+    for (const e of events) if (e.type === 'leak') this.deepLife -= 1;
+  }
+
+  _audioForEvents(events) {
+    for (const e of events) {
+      if (e.type === 'fishKilled') Audio.sfx.pop();
+      else if (e.type === 'leak') Audio.sfx.leak();
+      else if (e.type === 'weave') Audio.sfx.weave();
+      else if (e.type === 'transform') Audio.sfx.transform();
+    }
+  }
+
+  _rotateGate() {
+    const gate = document.getElementById('rotate-gate');
+    const check = () => {
+      const landscapePhone = window.innerWidth > window.innerHeight && Math.min(window.innerWidth, window.innerHeight) < 600;
+      gate.style.display = landscapePhone ? 'flex' : 'none';
+    };
+    window.addEventListener('resize', check);
+    check();
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => { window.game = new Game(); });
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* offline support optional */ });
+  });
+}
