@@ -60,35 +60,68 @@ function triGeo(tris) {
   return g;
 }
 
-// A cute fish facing +Y (up): plump rounded body, forked caudal tail fin, a
-// little dorsal fin and two pectoral side fins. Enemies get rotated 180°.
-// (Rendered with DoubleSide so the flat fins read from the front camera.)
+// Parametric fish body: a spindle that is pointed at the head (+Y), widest just
+// ahead of centre, and tapers to a thin caudal peduncle (-Y). UVs: u around the
+// body, v along it (0 tail -> 1 head) so the pattern tiles and the shader can
+// place eyes near the head.
+function buildFishBody() {
+  const NR = 15, NS = 12;
+  const yTail = -0.6, yHead = 0.62;
+  const wx = (s) => 0.35 * Math.pow(Math.max(0, Math.sin(Math.PI * Math.pow(s, 1.3))), 0.8);
+  const wz = (s) => 0.24 * Math.pow(Math.max(0, Math.sin(Math.PI * Math.pow(s, 1.25))), 0.8);
+
+  const pos = [], uv = [], idx = [];
+  const cols = NS + 1;
+  for (let i = 0; i < NR; i++) {
+    const s = 0.05 + 0.9 * (i / (NR - 1));
+    const y = yTail + (yHead - yTail) * s;
+    const rx = wx(s), rz = wz(s);
+    for (let j = 0; j <= NS; j++) {
+      const a = (j / NS) * Math.PI * 2;
+      pos.push(Math.cos(a) * rx, y, Math.sin(a) * rz);
+      uv.push(j / NS, s);
+    }
+  }
+  for (let i = 0; i < NR - 1; i++) {
+    for (let j = 0; j < NS; j++) {
+      const a = i * cols + j, b = a + cols;
+      idx.push(a, b, a + 1, a + 1, b, b + 1);
+    }
+  }
+  const tailIdx = pos.length / 3; pos.push(0, yTail - 0.02, 0); uv.push(0.5, 0.0);
+  const headIdx = pos.length / 3; pos.push(0, yHead + 0.04, 0); uv.push(0.5, 1.0);
+  const base = (NR - 1) * cols;
+  for (let j = 0; j < NS; j++) {
+    idx.push(tailIdx, j + 1, j);
+    idx.push(headIdx, base + j, base + j + 1);
+  }
+
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(new Float32Array(pos.length), 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  return g;
+}
+
+// A realistic-ish fish facing +Y (up): spindle body, forked caudal tail, and two
+// swept-back pectoral fins. Enemies are rotated 180°. DoubleSide so fins read.
 export function buildFishGeometry() {
-  // Plump, slightly egg-shaped body (rounder head at +Y).
-  const body = new THREE.SphereGeometry(0.5, 16, 12);
-  body.scale(0.5, 0.74, 0.46);
-  body.translate(0, 0.06, 0);
+  const body = buildFishBody();
 
-  // Forked caudal tail fin (flat, at the back / -Y).
+  // Forked caudal tail fin (flat), with a central notch.
   const tail = triGeo([
-    [[0, -0.46, 0], [0.44, -1.04, 0], [0, -0.74, 0]],
-    [[0, -0.46, 0], [0, -0.74, 0], [-0.44, -1.04, 0]],
+    [[0.07, -0.55, 0], [0.40, -1.18, 0], [0.02, -0.9, 0]],
+    [[-0.07, -0.55, 0], [-0.02, -0.9, 0], [-0.40, -1.18, 0]],
+    [[0.07, -0.55, 0], [0.02, -0.9, 0], [-0.07, -0.55, 0]],
+    [[-0.07, -0.55, 0], [0.02, -0.9, 0], [-0.02, -0.9, 0]],
   ]);
 
-  // Little dorsal fin on top of the body (near the head).
-  const dorsal = triGeo([
-    [[-0.12, 0.42, 0], [0.12, 0.42, 0], [0.02, 0.66, 0]],
-  ]);
+  // Swept-back pectoral fins on each side, mid-body.
+  const pecR = triGeo([[[0.30, 0.08, 0.04], [0.66, -0.14, 0], [0.33, -0.24, 0.02]]]);
+  const pecL = triGeo([[[-0.30, 0.08, 0.04], [-0.33, -0.24, 0.02], [-0.66, -0.14, 0]]]);
 
-  // Two pectoral side fins around mid-body.
-  const pecR = triGeo([
-    [[0.40, 0.10, 0], [0.66, 0.20, 0], [0.46, -0.14, 0]],
-  ]);
-  const pecL = triGeo([
-    [[-0.40, 0.10, 0], [-0.46, -0.14, 0], [-0.66, 0.20, 0]],
-  ]);
-
-  const geo = mergeGeoms([body, tail, dorsal, pecR, pecL]);
+  const geo = mergeGeoms([body, tail, pecR, pecL]);
   geo.computeVertexNormals();
   return geo;
 }

@@ -2,6 +2,12 @@
 
 All notable changes to Fish Friends.
 
+## [1.15.0] — 2026-07-05
+- **Realistic fish model:** replaced the blobby fish with a proper spindle body
+  (pointed head, wide middle, thin tail base), a forked caudal tail, swept
+  pectoral fins, the diagonal scale pattern, and two eyes near the head that lead
+  the swim direction.
+
 ## [1.14.0] — 2026-07-05
 - **Real music track:** replaced the synth loop with `FishFriendsSong.mp3`, playing
   as looping background music across the menu and gameplay (starts on your first tap,
