@@ -4,7 +4,7 @@
 // counters (feasible-by-construction: required launch-time <= apmGuardPct of gap).
 // Nothing here imports three.js or the DOM.
 
-import { COOLDOWN, LEVEL, POINTS, cooldownFor, opposite, CURRENT, CORAL, SPECIAL_ROWS, SHUFFLE_PICKER_FROM } from './config.js';
+import { COOLDOWN, LEVEL, POINTS, cooldownFor, opposite, CURRENT, CORAL, SPECIAL_ROWS, SHUFFLE_PICKER_FROM, FISH_DENSITY } from './config.js';
 import { makeRng } from './rng.js';
 
 // Enemy color pools by "colors in play" count.
@@ -185,9 +185,10 @@ export function compileLevel(def) {
     for (const s of rowSpawns) spawns.push(s);
 
     // Compute perfect-player launch time to resolve this row, then space next row.
+    // Wider gaps (÷ FISH_DENSITY) => ~10% fewer rows/fish across every level.
     const rowCost = rowLaunchTime(rowSpawns);
-    const gap = Math.max(def.minGap, rowCost / LEVEL.apmGuardPct) * gapScale
-      + rng.next() * 0.4;
+    const gap = (Math.max(def.minGap, rowCost / LEVEL.apmGuardPct) * gapScale
+      + rng.next() * 0.4) / FISH_DENSITY;
     t += gap;
     rowIndex++;
   }

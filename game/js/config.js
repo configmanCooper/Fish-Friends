@@ -57,7 +57,7 @@ export const FIELD = {
 // Movement speeds (field-units per second).
 // ---------------------------------------------------------------------------
 export const SPEED = {
-  enemyBase: 0.085,     // base enemy descend speed at level 1
+  enemyBase: 0.068,     // base enemy descend speed (20% slower than the original 0.085)
   player: 0.34,         // player fish ascend speed (fast, feels responsive)
   friendSwimOff: 0.9,   // paired "friends" swim off screen this fast (render only)
   whiteMult: 0.6,       // white fish speed multiplier
@@ -148,6 +148,10 @@ export const CORAL = {
 // Levels that can spawn full rows of a special fish, and shuffled picker.
 export const SPECIAL_ROWS = { white: 30, black: 33, tri: 35 };
 export const SHUFFLE_PICKER_FROM = 30;
+
+// Global fish-count scaler: rows are spaced wider by 1/FISH_DENSITY so every
+// level spawns ~FISH_DENSITY of the fish it otherwise would (0.9 = 10% fewer).
+export const FISH_DENSITY = 0.9;
 
 // ---------------------------------------------------------------------------
 // Endless "The Deep".

@@ -2,6 +2,11 @@
 
 All notable changes to Fish Friends.
 
+## [1.13.0] — 2026-07-05
+- **Calmer pace:** enemy fish swim **20% slower**, and every level spawns **~10%
+  fewer fish** (rows spaced a little wider). Pass/star targets scale automatically
+  and all 40 levels remain 3★-clearable.
+
 ## [1.12.1] — 2026-07-05
 - **Current direction arrows:** water-current bands now show a scrolling row of
   little translucent-blue arrows pointing the way the current flows, so the
