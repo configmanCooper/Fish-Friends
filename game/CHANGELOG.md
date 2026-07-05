@@ -2,6 +2,14 @@
 
 All notable changes to Fish Friends.
 
+## [1.9.0] — 2026-07-05
+- **Install App button** on the main menu: on Android/desktop Chrome it appears
+  when the browser offers installation and launches the native "Add to Home
+  screen" prompt (hidden once installed or when unsupported, e.g. iOS Safari —
+  there a fallback toast points to the browser menu).
+- **Proper PWA icons:** added dedicated 192px and 512px (incl. maskable) icons so
+  the app installs cleanly with a real home-screen icon.
+
 ## [1.8.0] — 2026-07-05
 - **Friendlier copy:** pre-level hint now says "Touch, or touch and drag, on the
   beach to draw fish…"; Ice Cube reads "all fish friends swim at half speed";

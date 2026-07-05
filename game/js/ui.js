@@ -42,6 +42,7 @@ export class UI {
           <button class="btn btn-primary" data-action="play">Play</button>
           <button class="btn" data-action="deep" id="btn-deep">The Deep 🌊</button>
           <button class="btn" data-action="settings">Settings ⚙️</button>
+          <button class="btn" data-action="install" id="btn-install" style="display:none">📲 Install App</button>
         </div>
       </div>
 
@@ -150,6 +151,7 @@ export class UI {
     const g = this.game;
     switch (a) {
       case 'play': g.goToMap(); break;
+      case 'install': g.promptInstall(); break;
       case 'title': g.goToTitle(); break;
       case 'deep': g.startDeep(); break;
       case 'settings': g.openSettings(); break;

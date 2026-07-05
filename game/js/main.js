@@ -54,8 +54,38 @@ class Game {
     });
     window.addEventListener('pointerdown', () => Audio.unlock(), { once: true });
     window.addEventListener('keydown', (e) => this._cheatKey(e));
+    this._setupInstallPrompt();
 
     requestAnimationFrame((t) => this._loop(t));
+  }
+
+  // ---- PWA install prompt (Android/desktop Chrome) -----------------------
+  _setupInstallPrompt() {
+    this._installEvent = null;
+    const btn = document.getElementById('btn-install');
+    // Already running as an installed app? never show.
+    const installed = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();           // stop Chrome's mini-infobar; we drive it
+      this._installEvent = e;
+      if (btn && !installed) btn.style.display = '';
+    });
+    window.addEventListener('appinstalled', () => {
+      this._installEvent = null;
+      if (btn) btn.style.display = 'none';
+      this.ui.toast('Installed! 🐟');
+    });
+  }
+  async promptInstall() {
+    const btn = document.getElementById('btn-install');
+    if (!this._installEvent) {
+      this.ui.toast('Use your browser menu → "Add to Home screen"');
+      return;
+    }
+    this._installEvent.prompt();
+    try { await this._installEvent.userChoice; } catch (_) {}
+    this._installEvent = null;
+    if (btn) btn.style.display = 'none';
   }
 
   // Detect the "fish" cheat sequence anywhere -> toggle god mode.

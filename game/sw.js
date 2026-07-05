@@ -1,12 +1,14 @@
 // sw.js — precache everything for offline / PWA.
-const CACHE = 'fishfriends-v12';
+const CACHE = 'fishfriends-v13';
 const ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
   './favicon.png',
-  './css/style.css?v=12',
-  './js/main.js?v=12',
+  './icon-192.png',
+  './icon-512.png',
+  './css/style.css?v=13',
+  './js/main.js?v=13',
   './js/config.js', './js/rng.js', './js/levels.js', './js/sim.js',
   './js/render3d.js', './js/fish_models.js', './js/fx.js',
   './js/input.js', './js/ui.js', './js/shop.js', './js/save.js',
