@@ -6,14 +6,22 @@ import { LEVELS } from './levels.js';
 const SCREENS = ['title', 'map', 'prelevel', 'game', 'results', 'shop', 'settings'];
 
 // Starfish icon (inline SVG) — the game's currency & level rating.
-const STARFISH_PATH = 'M12 2 L15.2 7.6 L21.5 8.9 L17.2 13.7 L17.9 20.1 L12 17.5 L6.1 20.1 L6.8 13.7 L2.5 8.9 L8.8 7.6 Z';
+// Chunky rounded 5-armed sea-star (fat quadratic-bezier arms) with bump spots.
+const STARFISH_PATH = 'M 8.18 6.74 Q 12 -3 15.82 6.74 Q 26.27 7.36 18.18 14.01 Q 20.82 24.14 12 18.5 Q 3.18 24.14 5.82 14.01 Q -2.27 7.36 8.18 6.74 Z';
 function sfSVG(size, filled = true) {
-  const fill = filled ? '#f4a13a' : 'rgba(255,255,255,0.12)';
-  const stroke = filled ? '#c9791d' : 'rgba(255,255,255,0.3)';
+  const fill = filled ? '#f2933a' : 'rgba(255,255,255,0.12)';
+  const stroke = filled ? '#c9761d' : 'rgba(255,255,255,0.3)';
   const dots = filled
-    ? '<circle cx="12" cy="9.5" r="0.9" fill="rgba(255,255,255,0.55)"/><circle cx="10" cy="12" r="0.7" fill="rgba(255,255,255,0.45)"/><circle cx="14" cy="12" r="0.7" fill="rgba(255,255,255,0.45)"/>'
+    ? '<g fill="#ffd9a8" opacity="0.8">' +
+      '<circle cx="12" cy="12" r="1.4"/>' +
+      '<circle cx="12" cy="5.6" r="0.9"/>' +
+      '<circle cx="18.4" cy="9.9" r="0.9"/>' +
+      '<circle cx="15.9" cy="17.3" r="0.9"/>' +
+      '<circle cx="8.1" cy="17.3" r="0.9"/>' +
+      '<circle cx="5.6" cy="9.9" r="0.9"/>' +
+      '</g>'
     : '';
-  return `<svg class="sf" viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align:middle;margin:0 1px"><path d="${STARFISH_PATH}" fill="${fill}" stroke="${stroke}" stroke-width="1.3" stroke-linejoin="round"/>${dots}</svg>`;
+  return `<svg class="sf" viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align:middle;margin:0 1px"><path d="${STARFISH_PATH}" fill="${fill}" stroke="${stroke}" stroke-width="1.1" stroke-linejoin="round"/>${dots}</svg>`;
 }
 const SF = sfSVG(16), SF_BIG = sfSVG(22), SF_SM = sfSVG(13);
 

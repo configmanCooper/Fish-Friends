@@ -2,6 +2,10 @@
 
 All notable changes to Fish Friends.
 
+## [1.5.1] — 2026-07-04
+- **Starfish icon redesign:** the currency/rating icon now looks like an actual
+  chunky sea-star (fat rounded arms + spots) instead of a plain sharp star.
+
 ## [1.5.0] — 2026-07-04
 - **Auto-deploy shark setting:** new Settings toggle "Auto-deploy shark near
   bottom". When on, if an enemy comes within **~1 second** of reaching the bottom
