@@ -2,6 +2,10 @@
 
 All notable changes to Fish Friends.
 
+## [1.13.1] — 2026-07-05
+- **Hazards start later:** water currents now begin at **Level 25** (two from L28),
+  and the coral reef now begins at **Level 30**.
+
 ## [1.13.0] — 2026-07-05
 - **Calmer pace:** enemy fish swim **20% slower**, and every level spawns **~10%
   fewer fish** (rows spaced a little wider). Pass/star targets scale automatically

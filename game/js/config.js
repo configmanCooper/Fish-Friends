@@ -129,7 +129,7 @@ export const ROW_YS = Array.from({ length: ROWS }, (_, i) => 0.22 + 0.56 * i / (
 export const CURRENT = {
   flipInterval: 15,
   band: 0.04,                 // crossing detection half-height
-  rowsFrom: 23,               // currents appear from this level
+  rowsFrom: 25,               // currents appear from this level
   twoFrom: 28,                // two currents from this level
   candidateRows: [1, 2, 3, 4],// never the row nearest the beach or the top
 };
@@ -137,7 +137,7 @@ export const CURRENT = {
 // Coral reef: a single grid cell that blocks fish. Moves every `moveInterval`s,
 // disintegrates `disintegrateBefore` seconds before the level ends.
 export const CORAL = {
-  from: 25,                   // coral appears from this level
+  from: 30,                   // coral appears from this level
   moveInterval: 10,
   disintegrateBefore: 10,
   candidateRows: [2, 3],      // never the first two or last two rows
