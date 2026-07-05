@@ -244,6 +244,7 @@ export class Render3D {
         this.floaters.spawn(this.worldX(e.lane), this.worldY(0.5), 1, '+' + e.value);
       } else if (e.type === 'squidEat') {
         this.fx.spawn(this.worldX(e.lane), this.worldY(0.5), 0.5, 0x7a4fb0, { count: 10, speed: 0.6 });
+        if (e.scored) this.floaters.spawn(this.worldX(e.lane), this.worldY(0.5), 1, '+1');
       } else if (e.type === 'wastePenalty') {
         this.fx.spawn(this.worldX(e.lane), this.worldY(0.98), 0.5, 0xff8a5a, { count: 10, up: 0.4, speed: 0.5 });
         this.floaters.spawn(this.worldX(e.lane), this.worldY(0.94), 1, '-1');

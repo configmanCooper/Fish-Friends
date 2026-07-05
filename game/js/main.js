@@ -109,8 +109,8 @@ class Game {
 
   buyItem(kind) {
     if (this.godMode) {
-      // unlimited starfish: grant the item free and ignore the stack cap
-      this.save.inventory[kind] = (this.save.inventory[kind] || 0) + 1;
+      // unlimited starfish: grant the item free and ignore the stack cap (sharks ×2)
+      this.save.inventory[kind] = (this.save.inventory[kind] || 0) + (kind === 'shark' ? 2 : 1);
       Audio.sfx.buy(); Save.save(this.save); this.ui.renderShop(this.save, true);
       return;
     }
@@ -132,11 +132,13 @@ class Game {
     this.render.setLevel(this.level.lanes);
     this.selectedColor = this.level.picker[0];
     this.pendingShark = false;
+    this.itemsUsedThisLevel = new Set(); // each item once per level
+    this.itemUseCount = 0;               // max 3 items per level
     this.acc = 0;
     this.paused = false;
     this.state = 'game';
     this.ui.renderPicker(this.level, this.selectedColor);
-    this.ui.renderDock(this.save, null);
+    this.ui.renderDock(this.save, this.itemsUsedThisLevel, this.itemUseCount);
     this.ui.show('game');
     Audio.playMusic('game');
   }
@@ -179,10 +181,12 @@ class Game {
     this.deepNextChunk = 0;
     this.deepStarfishBanked = 0;
     this.pendingShark = false;
+    this.itemsUsedThisLevel = new Set();
+    this.itemUseCount = 0;
     this.acc = 0; this.paused = false;
     this.state = 'game';
     this.ui.renderPicker(this.level, this.selectedColor);
-    this.ui.renderDock(this.save, null);
+    this.ui.renderDock(this.save, this.itemsUsedThisLevel, this.itemUseCount);
     this.ui.show('game');
     Audio.playMusic('game');
   }
@@ -227,13 +231,20 @@ class Game {
   useItem(kind) {
     if (!this.isPlaying()) return;
     if ((this.save.inventory[kind] || 0) <= 0) return;
+    // Per-level limits (normal levels only; The Deep is unrestricted).
+    if (!this.deep) {
+      if (kind === 'shark' && this.pendingShark) { this.pendingShark = false; this.ui.toast('Shark cancelled'); this._renderDock(); return; }
+      if (this.itemsUsedThisLevel.has(kind)) { this.ui.toast(`${POWERUPS[kind].name} already used this level`); return; }
+      if (this.itemUseCount >= 3) { this.ui.toast('Item limit reached (3 per level)'); return; }
+    }
     if (kind === 'shark') {
-      if (this.pendingShark) { this.pendingShark = false; this.ui.toast('Shark cancelled'); return; }
+      if (this.pendingShark) { this.pendingShark = false; this.ui.toast('Shark cancelled'); this._renderDock(); return; }
       this.pendingShark = true;
       this.sharkLane = Math.floor(this.level.lanes / 2) - 1;
       this.ui.toast('Drag on the seabed to aim the shark');
       return;
     }
+    this._markItemUsed(kind);
     this._consume(kind);
     if (kind === 'ice') { this.sim.useIce(); Audio.sfx.squid(); }
     if (kind === 'rainbow') { this.sim.useRainbow(); Audio.sfx.transform(); }
@@ -243,15 +254,25 @@ class Game {
   confirmShark() {
     if (!this.pendingShark) return;
     this.pendingShark = false;
+    this._markItemUsed('shark');
     this._consume('shark');
     this.sim.useShark(this.sharkLane);
     Audio.sfx.shark();
   }
 
+  _markItemUsed(kind) {
+    if (this.deep) return;
+    this.itemsUsedThisLevel.add(kind);
+    this.itemUseCount++;
+  }
+  _renderDock() {
+    this.ui.renderDock(this.save, this.itemsUsedThisLevel, this.itemUseCount, this.deep);
+  }
+
   _consume(kind) {
     this.save.inventory[kind] = Math.max(0, (this.save.inventory[kind] || 0) - 1);
     Save.save(this.save);
-    this.ui.renderDock(this.save, null);
+    this._renderDock();
   }
 
   // ---- pause -------------------------------------------------------------
@@ -283,7 +304,7 @@ class Game {
         s.useShark(e.lane - 1);
         this.save.inventory.shark = Math.max(0, (this.save.inventory.shark || 0) - 1);
         Save.save(this.save);
-        this.ui.renderDock(this.save, null);
+        this._renderDock();
         Audio.sfx.shark();
         const w = 3, l0 = Math.max(0, Math.min(e.lane - 1, s.lanes - w));
         for (let i = 0; i < w; i++) covered.add(l0 + i);

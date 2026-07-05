@@ -173,18 +173,30 @@ function testRainbowAdvancesSpecials() {
 // ---------------------------------------------------------------------------
 // 5. Power-up rules: squid 0 pts, shark full value, ice slows.
 // ---------------------------------------------------------------------------
-function testSquidZeroPoints() {
-  // interior lane enemy, squid active -> eaten, 0 points.
+function testSquidScoresHalf() {
+  // two interior-lane enemies, squid active -> 2 eaten => +1 point.
+  const lvl = makeLevel([
+    { t: 0.1, lane: 1, kind: 'normal', color: 'blue', value: 1 },
+    { t: 0.1, lane: 1, kind: 'normal', color: 'blue', value: 1 },
+  ], { lanes: 3 });
+  const sim = new Sim(lvl);
+  sim.useSquid();
+  let eats = 0;
+  for (let i = 0; i < 60 * 30 && !sim.ended; i++) {
+    sim.tick(1 / 60);
+    for (const e of sim.drainEvents()) if (e.type === 'squidEat') eats++;
+  }
+  ok(eats >= 2, 'squid ate both interior enemies');
+  eq(sim.score, 1, 'squid awards 1 point per 2 eaten');
+}
+
+function testSquidOneEatNoPoint() {
+  // a single interior eat awards 0 (needs 2 for a point).
   const lvl = makeLevel([{ t: 0.1, lane: 1, kind: 'normal', color: 'blue', value: 1 }], { lanes: 3 });
   const sim = new Sim(lvl);
   sim.useSquid();
-  let ate = false;
-  for (let i = 0; i < 60 * 30 && !sim.ended; i++) {
-    sim.tick(1 / 60);
-    for (const e of sim.drainEvents()) if (e.type === 'squidEat') ate = true;
-  }
-  ok(ate, 'squid ate interior enemy');
-  eq(sim.score, 0, 'squid kill awards 0 points');
+  for (let i = 0; i < 60 * 30 && !sim.ended; i++) { sim.tick(1 / 60); sim.drainEvents(); }
+  eq(sim.score, 0, 'single squid eat awards 0 (half-point rule)');
 }
 
 function testSquidEdgeLanesOpen() {
@@ -326,7 +338,8 @@ function main() {
   testTriMachine();
   testTriWrongOrder();
   testRainbowAdvancesSpecials();
-  testSquidZeroPoints();
+  testSquidScoresHalf();
+  testSquidOneEatNoPoint();
   testSquidEdgeLanesOpen();
   testSharkFullValue();
   testIceSlows();

@@ -73,6 +73,7 @@ export class Sim {
     this.leaks = 0;
     this.kills = 0;
     this.wastedFish = 0;   // player fish that escaped the top without a hit (2 => -1)
+    this.squidEats = 0;    // squid eats accumulator (2 eaten => +1)
 
     this._resolvedCount = 0; // scripted spawns that have been spawned
   }
@@ -195,7 +196,7 @@ export class Sim {
         if (!e.alive) continue;
         if (!sh.lanes.includes(e.lane)) continue;
         if (e.y <= sh.y + 0.14 && e.y >= sh.y - 0.16) {
-          const val = remainingValue(e);
+          const val = remainingValue(e); // shark scores the fish's full remaining value
           this.addScore(val);
           e.alive = false;
           this.kills++;
@@ -212,8 +213,11 @@ export class Sim {
       if (!e.alive) continue;
       if (!this.isInteriorLane(e.lane)) continue;
       if (e.y <= this.squidY) {
-        e.alive = false; // eaten, 0 points
-        this.emit('squidEat', { id: e.id, lane: e.lane });
+        e.alive = false; // eaten
+        this.squidEats++;
+        let scored = false;
+        if (this.squidEats >= 2) { this.squidEats -= 2; this.addScore(1); scored = true; } // 1 pt / 2 eaten
+        this.emit('squidEat', { id: e.id, lane: e.lane, scored });
       }
     }
   }

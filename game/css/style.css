@@ -111,6 +111,7 @@ html, body {
   background: var(--c-panel); border: 1px solid rgba(255,255,255,0.2); font-size: 22px; cursor: pointer; color: #fff; }
 .dock-n { position: absolute; right: -4px; top: -6px; background: var(--c-accent); color: #26160a;
   border-radius: 999px; font-size: 12px; font-weight: 700; padding: 1px 6px; }
+.dock-btn.spent { opacity: 0.35; filter: grayscale(0.7); pointer-events: none; }
 
 #cooldown-strip { position: absolute; left: 0; right: 0; bottom: 0; height: 15%;
   background: rgba(0,0,0,0.12); pointer-events: none; }

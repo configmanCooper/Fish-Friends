@@ -250,16 +250,22 @@ export class UI {
     }
   }
 
-  renderDock(saveData, activeEffects) {
+  renderDock(saveData, usedKinds, useCount, deep) {
     const dock = document.getElementById('powerup-dock');
     dock.innerHTML = '';
+    const used = usedKinds || new Set();
+    const atLimit = !deep && (useCount || 0) >= 3;
     for (const k of ['shark', 'ice', 'rainbow', 'squid']) {
       const count = saveData.inventory[k] || 0;
       if (count <= 0) continue;
+      const spent = !deep && used.has(k);
+      const disabled = spent || (atLimit && !spent);
       const b = document.createElement('button');
-      b.className = 'dock-btn';
-      b.dataset.action = 'use-item';
-      b.dataset.item = k;
+      b.className = 'dock-btn' + (disabled ? ' spent' : '');
+      if (!disabled) { b.dataset.action = 'use-item'; b.dataset.item = k; }
+      b.disabled = disabled;
+      b.title = spent ? `${POWERUPS[k].name} already used this level`
+        : (atLimit ? 'Item limit reached (3 per level)' : POWERUPS[k].name);
       b.innerHTML = `${POWERUPS[k].icon}<span class="dock-n">${count}</span>`;
       dock.appendChild(b);
     }
@@ -361,8 +367,8 @@ function starStr(n) { let s = ''; for (let i = 0; i < 3; i++) s += sfSVG(13, i <
 function shopDesc(k) {
   return {
     ice: '15s: all enemies at half speed.',
-    shark: 'Sweep 3 lanes, eat everything for full points.',
+    shark: 'Sweep 3 lanes, eat every fish for full points. Buy gives ×2.',
     rainbow: '15s: your fish counter ANY color.',
-    squid: '30s: eats interior lanes (0 pts) — a breather.',
+    squid: '30s: eats interior lanes, +1 per 2 eaten.',
   }[k];
 }

@@ -11,7 +11,8 @@ export function canBuy(saveData, kind) {
 export function buy(saveData, kind) {
   if (!canBuy(saveData, kind)) return false;
   saveData.starfish -= POWERUPS[kind].price;
-  saveData.inventory[kind] = (saveData.inventory[kind] || 0) + 1;
+  const amount = kind === 'shark' ? 2 : 1; // sharks come in pairs
+  saveData.inventory[kind] = Math.min(INV_CAP, (saveData.inventory[kind] || 0) + amount);
   return true;
 }
 

@@ -2,6 +2,18 @@
 
 All notable changes to Fish Friends.
 
+## [1.6.0] — 2026-07-04
+- **Squid now scores:** the Giant Squid gives **+1 point for every 2 fish** it eats
+  (was 0). Shark still eats every fish in its lanes for **full value**.
+- **Per-level item limits:** you may use a **max of 3 items per level**, and **each
+  item only once** per level. Used / over-limit items grey out in the dock. (The
+  Deep is unrestricted.)
+- **Sharks come in pairs:** buying a Shark in the shop now gives **×2**.
+- **Special fish scoring** confirmed at white = 2, black = 2, tri = 3 points total
+  (awarded per correct hit), and level max-scores reflect this.
+- **GitHub Pages ready:** added a root redirect `index.html` → `game/index.html`
+  plus `.nojekyll`, so the repo can be served directly from Pages.
+
 ## [1.5.1] — 2026-07-04
 - **Starfish icon redesign:** the currency/rating icon now looks like an actual
   chunky sea-star (fat rounded arms + spots) instead of a plain sharp star.
