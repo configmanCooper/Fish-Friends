@@ -2,6 +2,11 @@
 
 All notable changes to Fish Friends.
 
+## [1.18.0] — 2026-07-05
+- **Faster early fish:** enemy ("friend") fish swim **10% faster before Level 20**.
+- **App icon tweak:** the blue fish's tail now crosses **over** the orange fish
+  (the orange fish's tail still crosses over the blue), so the two interlock.
+
 ## [1.17.0] — 2026-07-05
 - **Softer fish eyes:** eyes are now the fish's own colour, just slightly darker
   (no more creepy black dots).

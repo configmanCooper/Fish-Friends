@@ -83,7 +83,8 @@ function buildLevelDefs() {
       n,
       lanes: lanesFor(n),
       colorsInPlay: colors,
-      speedMult: 0.85 + (n - 1) * 0.021,
+      // enemy ("friend") fish swim 10% faster before level 20
+      speedMult: (0.85 + (n - 1) * 0.021) * (n < 20 ? 1.1 : 1),
       rowSizeMin: n === 1 ? 1 : 2,
       rowSizeMax: maxSize,
       minGap: Math.max(1.8, 3.0 - (n - 1) * 0.03),
