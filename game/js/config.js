@@ -118,6 +118,38 @@ export const POWERUPS = {
 export const SPECIAL_INTRO = { white: 12, black: 14, tri: 20 };
 
 // ---------------------------------------------------------------------------
+// Grid "rows" (horizontal bands) used by water currents & coral reefs.
+// Row 0 is closest to the beach (bottom), the last row is at the top.
+// ---------------------------------------------------------------------------
+export const ROWS = 6;
+export const ROW_YS = Array.from({ length: ROWS }, (_, i) => 0.22 + 0.56 * i / (ROWS - 1));
+
+// Water currents: a horizontal band that shoves fish 1 lane left/right as they
+// cross it; direction flips every `flipInterval` seconds.
+export const CURRENT = {
+  flipInterval: 15,
+  band: 0.04,                 // crossing detection half-height
+  rowsFrom: 23,               // currents appear from this level
+  twoFrom: 28,                // two currents from this level
+  candidateRows: [1, 2, 3, 4],// never the row nearest the beach or the top
+};
+
+// Coral reef: a single grid cell that blocks fish. Moves every `moveInterval`s,
+// disintegrates `disintegrateBefore` seconds before the level ends.
+export const CORAL = {
+  from: 25,                   // coral appears from this level
+  moveInterval: 10,
+  disintegrateBefore: 10,
+  candidateRows: [2, 3],      // never the first two or last two rows
+  stopMargin: 0.03,
+  stackSpacing: 0.06,
+};
+
+// Levels that can spawn full rows of a special fish, and shuffled picker.
+export const SPECIAL_ROWS = { white: 30, black: 33, tri: 35 };
+export const SHUFFLE_PICKER_FROM = 30;
+
+// ---------------------------------------------------------------------------
 // Endless "The Deep".
 // ---------------------------------------------------------------------------
 export const DEEP = {

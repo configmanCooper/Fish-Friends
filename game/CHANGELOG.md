@@ -2,6 +2,18 @@
 
 All notable changes to Fish Friends.
 
+## [1.12.0] — 2026-07-05
+- **Water currents (from L23):** a subtle moving-water band in a middle row shoves
+  the incoming (enemy) fish one lane sideways as they cross it, flipping direction
+  every 15s. One current L23-27, **two** from L28. Sharks and the squid ignore them.
+- **Coral reef (from L25):** a single grid cell (in a middle row) that blocks fish —
+  your fish hit it and swim away, incoming fish stop and stack behind it. It drifts
+  one lane every 10s and disintegrates 10s before the level ends. Sharks pass right
+  through it; it doesn't affect the squid.
+- **Rows of special fish:** whole rows of white (L30+), black (L33+) and tri-colour
+  (L35+, all sharing one 3-colour pattern).
+- **Shuffled palette (L30+):** your colour buttons are arranged in a random order.
+
 ## [1.11.0] — 2026-07-05
 - **Level 1 is now 45 seconds** (down from 60). Level duration is now per-level
   (spawn window and pass targets scale with it); all other levels remain 60s.

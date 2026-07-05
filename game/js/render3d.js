@@ -4,7 +4,7 @@
 import * as THREE from './vendor/three.module.js';
 import { buildFishGeometry, buildTriGeometry, buildPatternAtlas, patternUvOffset, buildSharkGeometry, buildSquidGeometry } from './fish_models.js';
 import { ParticleFX, Floaters } from './fx.js';
-import { COLORS, SPEED, FIELD } from './config.js';
+import { COLORS, SPEED, FIELD, ROW_YS, CORAL } from './config.js';
 
 const H = 10;                 // world height for y in [0,1]
 const MARGIN = 0.05;          // side margin fraction of field width
@@ -45,11 +45,66 @@ export class Render3D {
     this._buildTriPrototype();
     this._buildShark();
     this._buildSquid();
+    this._buildCurrents();
+    this._buildCoral();
     this.fx = new ParticleFX(this.scene);
     this.floaters = new Floaters(this.scene);
 
     this.resize();
     window.addEventListener('resize', () => this.resize());
+  }
+
+  _buildCurrents() {
+    // Pool of subtle horizontal "moving water" bands (semi-transparent, additive,
+    // with a scrolling stripe shader driven by uTime * direction).
+    this.currentBands = [];
+    for (let i = 0; i < 2; i++) {
+      const geo = new THREE.PlaneGeometry(40, 0.9);
+      const mat = new THREE.ShaderMaterial({
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+        uniforms: { uTime: { value: 0 }, uDir: { value: 1 }, uOpacity: { value: 0.22 } },
+        vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+        fragmentShader: `
+          varying vec2 vUv; uniform float uTime; uniform float uDir; uniform float uOpacity;
+          void main(){
+            float x = vUv.x * 26.0 - uTime * uDir * 1.6;
+            float stripe = smoothstep(0.35, 0.5, abs(fract(x) - 0.5));
+            float edge = smoothstep(0.0, 0.25, vUv.y) * smoothstep(1.0, 0.75, vUv.y);
+            float a = (0.35 + 0.65 * stripe) * edge * uOpacity;
+            gl_FragColor = vec4(0.6, 0.85, 1.0, a);
+          }`,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.visible = false;
+      mesh.position.z = -1.5;
+      mesh.renderOrder = 1;
+      this.scene.add(mesh);
+      this.currentBands.push(mesh);
+    }
+  }
+
+  _buildCoral() {
+    // Procedural coral: a cluster of colored rounded branches.
+    const group = new THREE.Group();
+    const cols = [0xff6f8f, 0xff9a5a, 0xd66fff, 0xffd23f];
+    for (let i = 0; i < 7; i++) {
+      const h = 0.5 + Math.random() * 0.6;
+      const g = new THREE.CapsuleGeometry(0.12, h, 4, 8);
+      const m = new THREE.MeshLambertMaterial({ color: cols[i % cols.length] });
+      const b = new THREE.Mesh(g, m);
+      const a = (i / 7) * Math.PI * 2;
+      b.position.set(Math.cos(a) * 0.28, -0.1 + h * 0.4, Math.sin(a) * 0.12);
+      b.rotation.z = (Math.random() - 0.5) * 0.7;
+      group.add(b);
+    }
+    const base = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 8), new THREE.MeshLambertMaterial({ color: 0xd98f6a }));
+    base.scale.set(1.2, 0.6, 1.0);
+    group.add(base);
+    group.visible = false;
+    group.renderOrder = 2;
+    this.coralGroup = group;
+    this.coralX = null; // for slide animation
+    this.scene.add(group);
   }
 
   _buildShark() {
@@ -250,6 +305,10 @@ export class Render3D {
         this.floaters.spawn(this.worldX(e.lane), this.worldY(0.94), 1, '-1');
       } else if (e.type === 'launch') {
         for (const l of e.lanes) this.fx.spawn(this.worldX(l), this.worldY(FIELD.launchY), 0.5, 0xbfe8ff, { count: 5, up: 0.5, speed: 0.4, size: 5 });
+      } else if (e.type === 'coralBlockPlayer') {
+        this.fx.spawn(this.worldX(e.lane), this.worldY(e.y || 0.5), 0.6, 0xff9ab0, { count: 6, speed: 0.5, size: 6 });
+      } else if (e.type === 'currentPush') {
+        this.fx.spawn(this.worldX(e.lane), this.worldY(0.5), 0.6, 0x9fdcff, { count: 3, speed: 0.3, size: 5, life: 0.3 });
       }
     }
   }
@@ -291,9 +350,43 @@ export class Render3D {
     this._updateTri(sim);
     this._updateSharks(sim);
     this._updateSquid(sim);
+    this._updateCurrents(sim);
+    this._updateCoral(sim);
     this.fx.update(dt);
     this.floaters.update(dt);
     this.renderer.render(this.scene, this.camera);
+  }
+
+  _updateCurrents(sim) {
+    const cur = (sim && !sim.ended) ? (sim.currents || []) : [];
+    for (let i = 0; i < this.currentBands.length; i++) {
+      const band = this.currentBands[i];
+      const c = cur[i];
+      if (!c) { band.visible = false; continue; }
+      band.visible = true;
+      band.position.y = this.worldY(c.rowY);
+      band.material.uniforms.uTime.value = this.time;
+      band.material.uniforms.uDir.value = sim.currentDir(c);
+    }
+  }
+
+  _updateCoral(sim) {
+    const coral = (sim && !sim.ended) ? sim.coral : null;
+    if (!coral) {
+      if (this.coralGroup.visible) {
+        // disintegrate burst on the way out
+        this.fx.spawn(this.coralGroup.position.x, this.coralGroup.position.y, 0.6, 0xff8fae, { count: 24, speed: 1.2, life: 0.9 });
+        this.coralGroup.visible = false;
+        this.coralX = null;
+      }
+      return;
+    }
+    const targetX = this.worldX(coral.lane);
+    if (this.coralX === null) this.coralX = targetX;
+    else this.coralX += (targetX - this.coralX) * Math.min(1, 0.15); // slide to new lane
+    this.coralGroup.visible = true;
+    this.coralGroup.position.set(this.coralX, this.worldY(coral.rowY), 0.5);
+    this.coralGroup.rotation.y = this.time * 0.3;
   }
 
   // lane pitch in world units
@@ -377,7 +470,9 @@ export class Render3D {
         } else {
           colorId = e.color; patternId = patternForColor[e.color] || 0;
         }
-        writeFish(this.worldX(e.lane), this.worldY(e.y), 0, colorId, patternId, e.id * 0.7, this.enemyWag(e), false, false, scale);
+        const tx = this.worldX(e.lane);
+        if (e._rx === undefined) e._rx = tx; else e._rx += (tx - e._rx) * 0.25;
+        writeFish(e._rx, this.worldY(e.y), 0, colorId, patternId, e.id * 0.7, this.enemyWag(e), false, false, scale);
       }
       for (const p of sim.players) {
         const rainbow = p.color === 'rainbow';
@@ -426,7 +521,9 @@ export class Render3D {
           this.triFish.set(e.id, t);
         }
         if (t.phase !== e.phase) { this._paintTriBands(t.geo, e.bands, e.phase); t.phase = e.phase; }
-        t.mesh.position.set(this.worldX(e.lane), this.worldY(e.y), 0);
+        const txr = this.worldX(e.lane);
+        if (e._rx === undefined) e._rx = txr; else e._rx += (txr - e._rx) * 0.25;
+        t.mesh.position.set(e._rx, this.worldY(e.y), 0);
       }
     }
     for (const [id, t] of this.triFish) {

@@ -227,6 +227,9 @@ export class UI {
     if (specials.has('white')) hint = '⚪ White fish: hit twice with the SAME color.';
     if (specials.has('black')) hint = '⚫ Black fish: hit with a color, then its opposite.';
     if (specials.has('tri')) hint = '🌈 Tri fish: counter the FRONT band first, then back.';
+    // Hazard intro hints take priority on their first-appearance levels.
+    if (level.n === 25) hint = '🪸 A coral reef blocks a cell — fish can\'t pass it, and it drifts around.';
+    else if (level.n === 23) hint = '🌊 A water current sweeps fish sideways as they cross it — it flips every 15s.';
     demo.textContent = hint;
   }
 

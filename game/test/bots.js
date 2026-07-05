@@ -46,6 +46,9 @@ export function perfectBot(sim) {
   for (const e of sim.enemies) {
     if (!e.alive || covered.has(e.id)) continue;
     if (e.y <= 0.14) continue;
+    // Skip enemies currently blocked behind the coral reef in its lane — they
+    // can't be reached (player fish swim away) and they're safe until released.
+    if (sim.coral && e.lane === sim.coral.lane && e.coralStopped) continue;
     let need = requiredPlayerColor(e);
     if (need === null) need = phase0Color; // white/black phase0: any counter color
     if (!pickerSet.has(need)) continue;     // not selectable -> real player can't do it

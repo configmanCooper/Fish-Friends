@@ -5,6 +5,7 @@
 import {
   FIELD, SPEED, COOLDOWN, LEVEL, POINTS, POWERUPS, INV_CAP,
   cooldownFor, opposite, isCounter, COLORS,
+  ROW_YS, CURRENT, CORAL,
 } from './config.js';
 import { makeRng } from './rng.js';
 
@@ -75,11 +76,115 @@ export class Sim {
     this.wastedFish = 0;   // player fish that escaped the top without a hit (2 => -1)
     this.squidEats = 0;    // squid eats accumulator (2 eaten => +1)
 
+    this._initHazards();
+
     this._resolvedCount = 0; // scripted spawns that have been spawned
   }
 
   emit(type, data) { this.events.push({ t: this.time, type, ...data }); }
   drainEvents() { const e = this.events; this.events = []; return e; }
+
+  // ---- hazards: water currents + coral reef ------------------------------
+  _initHazards() {
+    // Water currents (horizontal push bands).
+    this.currents = [];
+    const nCur = this.level.currents || 0;
+    if (nCur > 0) {
+      const rows = this.rng.shuffle(CURRENT.candidateRows).slice(0, nCur);
+      for (let i = 0; i < rows.length; i++) {
+        this.currents.push({
+          id: 'cur' + i,
+          rowY: ROW_YS[rows[i]],
+          baseDir: this.rng.chance(0.5) ? 1 : -1,
+        });
+      }
+    }
+    // Coral reef (single blocking cell).
+    this.coral = null;
+    if (this.level.coral) {
+      const row = this.rng.pick(CORAL.candidateRows);
+      this.coral = {
+        lane: this.rng.int(0, this.lanes - 1),
+        rowY: ROW_YS[row],
+        _step: 0,
+        moveDir: this.rng.chance(0.5) ? 1 : -1,
+        gone: false,
+      };
+    }
+  }
+
+  // Effective current direction (flips every flipInterval seconds).
+  currentDir(c) {
+    const phase = Math.floor(this.time / CURRENT.flipInterval) % 2;
+    return phase === 0 ? c.baseDir : -c.baseDir;
+  }
+
+  // Push enemy fish 1 lane as they cross a current band (once per fish per
+  // current). Player fish you draw, sharks, and the squid are NOT affected.
+  applyCurrents() {
+    if (!this.currents.length) return;
+    for (const c of this.currents) {
+      const dir = this.currentDir(c);
+      for (const f of this.enemies) this._maybePush(f, c, dir);
+    }
+  }
+  _maybePush(f, c, dir) {
+    if (!f.alive) return;
+    if (Math.abs(f.y - c.rowY) > CURRENT.band) return;
+    if (!f._pushed) f._pushed = new Set();
+    if (f._pushed.has(c.id)) return;
+    f._pushed.add(c.id);
+    const nl = Math.max(0, Math.min(this.lanes - 1, f.lane + dir));
+    if (nl !== f.lane) { f.lane = nl; this.emit('currentPush', { id: f.id, lane: nl, dir }); }
+  }
+
+  // Coral reef: move on a 10s cadence, disintegrate near the end, block fish.
+  updateCoral() {
+    const c = this.coral;
+    if (!c) return;
+    const dur = this.level.duration || LEVEL.duration;
+    if (this.time >= dur - CORAL.disintegrateBefore) {
+      this.coral = null;
+      this.emit('coralGone', {});
+      return;
+    }
+    const step = Math.floor(this.time / CORAL.moveInterval);
+    if (step !== c._step) {
+      c._step = step;
+      // pick a direction that stays on the grid, then move one lane.
+      if (c.lane <= 0) c.moveDir = 1;
+      else if (c.lane >= this.lanes - 1) c.moveDir = -1;
+      else c.moveDir = this.rng.chance(0.5) ? 1 : -1;
+      c.lane = Math.max(0, Math.min(this.lanes - 1, c.lane + c.moveDir));
+      this.emit('coralMove', { lane: c.lane });
+    }
+  }
+
+  // Block enemies (they stop & stack above the coral) and remove player fish
+  // that reach it (they "swim away"). Sharks pass through; squid is unaffected.
+  applyCoral() {
+    const c = this.coral;
+    if (!c) return;
+    const stopY = c.rowY + CORAL.stopMargin;
+    const inLane = this.enemies
+      .filter((e) => e.alive && e.lane === c.lane)
+      .sort((a, b) => a.y - b.y);
+    let floor = stopY;
+    for (const e of inLane) {
+      if (e.y < floor) { e.y = floor; e.coralStopped = true; }
+      else e.coralStopped = false;
+      floor = Math.max(floor, e.y) + CORAL.stackSpacing;
+    }
+    // mark enemies no longer in the coral lane as free
+    for (const e of this.enemies) if (e.lane !== c.lane) e.coralStopped = false;
+    // player fish moving up hit the coral and swim away (no score, no penalty)
+    for (const p of this.players) {
+      if (p.alive && p.lane === c.lane && p.y >= c.rowY - CORAL.stopMargin) {
+        p.alive = false;
+        this.emit('coralBlockPlayer', { lane: p.lane, y: p.y });
+      }
+    }
+  }
 
   // ---- public control ----------------------------------------------------
   cooldownRemaining() { return Math.max(0, this.cooldownUntil - this.time); }
@@ -151,6 +256,9 @@ export class Sim {
 
     this.spawnDue();
     this.moveFish(dt);
+    this.applyCurrents();
+    this.updateCoral();
+    this.applyCoral();
     this.updateSharks(dt);
     this.squidPass();
     this.collide();
@@ -372,6 +480,7 @@ export class Sim {
       lanes: this.lanes, ended: this.ended,
       enemies: this.enemies, players: this.players, sharks: this.sharks,
       effects: this.effects, cooldown: this.cooldownProgress(),
+      currents: this.currents, coral: this.coral,
     };
   }
 }

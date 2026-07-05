@@ -55,6 +55,7 @@ function makeLevel(spawns, over = {}) {
     maxScore, passTarget: Math.ceil(maxScore * 0.5),
     twoStar: Math.ceil(maxScore * 0.75), threeStar: Math.ceil(maxScore * 0.95),
     speedMult: 1, seed: 123,
+    duration: over.duration, currents: over.currents || 0, coral: !!over.coral,
   };
 }
 
@@ -333,6 +334,96 @@ function testBlackSoftLockGuard() {
 }
 
 // ---------------------------------------------------------------------------
+// Hazards: water currents + coral reef.
+// ---------------------------------------------------------------------------
+function testCurrentPush() {
+  const lvl = makeLevel([], { lanes: 6, currents: 1 });
+  const sim = new Sim(lvl);
+  ok(sim.currents.length === 1, 'one current initialized');
+  const cur = sim.currents[0];
+  const dir = sim.currentDir(cur);
+  // place an enemy just above the current band in lane 2
+  const e = { id: 1, lane: 2, y: cur.rowY + 0.06, kind: 'normal', color: 'blue', alive: true };
+  sim.enemies.push(e);
+  const startLane = e.lane;
+  for (let i = 0; i < 60 * 3 && e.y > cur.rowY - 0.1; i++) sim.tick(1 / 60);
+  const expected = Math.max(0, Math.min(5, startLane + dir));
+  eq(e.lane, expected, 'current pushes enemy one lane in its direction');
+}
+
+function testCurrentFlips() {
+  const lvl = makeLevel([], { lanes: 6, currents: 1 });
+  const sim = new Sim(lvl);
+  const cur = sim.currents[0];
+  const d0 = sim.currentDir(cur);
+  sim.time = 16; // past the 15s flip
+  const d1 = sim.currentDir(cur);
+  eq(d1, -d0, 'current direction flips after 15s');
+}
+
+function testCurrentNotSharkSquid() {
+  const lvl = makeLevel([{ t: 0.1, lane: 2, kind: 'normal', color: 'blue', value: 1 }], { lanes: 6, currents: 1 });
+  const sim = new Sim(lvl);
+  sim.useShark(1);
+  const lanesBefore = sim.sharks[0].lanes.slice();
+  for (let i = 0; i < 30; i++) sim.tick(1 / 60);
+  eq(JSON.stringify(sim.sharks[0] ? sim.sharks[0].lanes : lanesBefore), JSON.stringify(lanesBefore), 'shark lanes unaffected by current');
+}
+
+function testCoralBlocksEnemy() {
+  const lvl = makeLevel([{ t: 999, lane: 0, kind: 'normal', color: 'blue', value: 1 }], { lanes: 5, coral: true });
+  const sim = new Sim(lvl);
+  ok(sim.coral, 'coral initialized');
+  const c = sim.coral;
+  const e = { id: 1, lane: c.lane, y: 0.9, kind: 'normal', color: 'blue', alive: true };
+  sim.enemies.push(e);
+  for (let i = 0; i < 60 * 8; i++) sim.tick(1 / 60); // within the first coral position
+  ok(e.alive, 'enemy not leaked (blocked by coral)');
+  ok(e.y >= c.rowY, 'enemy stopped at/above the coral, never passed it');
+  eq(sim.leaks, 0, 'coral-blocked enemy never leaks');
+}
+
+function testCoralRemovesPlayer() {
+  const lvl = makeLevel([{ t: 999, lane: 0, kind: 'normal', color: 'blue', value: 1 }], { lanes: 5, coral: true });
+  const sim = new Sim(lvl);
+  const c = sim.coral;
+  sim.players.push({ id: 2, lane: c.lane, y: 0.12, color: 'orange', alive: true, weaved: new Set() });
+  let swamAway = false;
+  for (let i = 0; i < 60 * 4; i++) {
+    sim.tick(1 / 60);
+    for (const ev of sim.drainEvents()) if (ev.type === 'coralBlockPlayer') swamAway = true;
+  }
+  ok(swamAway, 'player fish hits coral and swims away');
+}
+
+function testCoralDisintegrates() {
+  const lvl = makeLevel([], { lanes: 5, coral: true, duration: 30 });
+  const sim = new Sim(lvl);
+  sim.time = 21; // past duration - 10
+  let gone = false;
+  sim.tick(1 / 60);
+  for (const ev of sim.drainEvents()) if (ev.type === 'coralGone') gone = true;
+  ok(gone && !sim.coral, 'coral disintegrates 10s before the level ends');
+}
+
+function testSpecialRowsAndPicker() {
+  const l30 = compileLevel(LEVELS[29]);
+  const l35 = compileLevel(LEVELS[34]);
+  const rowKinds = (lvl) => {
+    const byT = {};
+    for (const s of lvl.spawns) (byT[s.t.toFixed(3)] ||= []).push(s);
+    const kinds = new Set();
+    for (const k in byT) { const r = byT[k]; if (r.length >= 2 && r.every((s) => s.kind === r[0].kind) && r[0].kind !== 'normal') kinds.add(r[0].kind); }
+    return kinds;
+  };
+  ok(rowKinds(l30).has('white'), 'L30 has white rows');
+  ok(rowKinds(l35).has('tri'), 'L35 has tri rows');
+  // shuffled picker is a permutation of the ordered picker
+  const ordered = ['orange', 'blue', 'green', 'red', 'purple', 'yellow'];
+  ok([...l30.picker].sort().join() === [...ordered].sort().join(), 'L30 picker is a permutation of all counters');
+}
+
+// ---------------------------------------------------------------------------
 function main() {
   testColors();
   testCooldown();
@@ -354,6 +445,13 @@ function main() {
   testBots();
   testDeterminism();
   testBlackSoftLockGuard();
+  testCurrentPush();
+  testCurrentFlips();
+  testCurrentNotSharkSquid();
+  testCoralBlocksEnemy();
+  testCoralRemovesPlayer();
+  testCoralDisintegrates();
+  testSpecialRowsAndPicker();
 
   console.log(`\n${pass} passed, ${fail} failed`);
   if (fail) {

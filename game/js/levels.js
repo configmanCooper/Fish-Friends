@@ -4,7 +4,7 @@
 // counters (feasible-by-construction: required launch-time <= apmGuardPct of gap).
 // Nothing here imports three.js or the DOM.
 
-import { COOLDOWN, LEVEL, POINTS, cooldownFor, opposite } from './config.js';
+import { COOLDOWN, LEVEL, POINTS, cooldownFor, opposite, CURRENT, CORAL, SPECIAL_ROWS, SHUFFLE_PICKER_FROM } from './config.js';
 import { makeRng } from './rng.js';
 
 // Enemy color pools by "colors in play" count.
@@ -91,6 +91,8 @@ function buildLevelDefs() {
       specials: specialsFor(n),
       newThing: isIntroLevel(n),
       duration: n === 1 ? 45 : undefined, // Level 1 is a shorter 45s tutorial
+      currents: n >= CURRENT.twoFrom ? 2 : (n >= CURRENT.rowsFrom ? 1 : 0),
+      coral: n >= CORAL.from,
     };
     defs.push(def);
   }
@@ -144,21 +146,40 @@ export function compileLevel(def) {
     ? Math.max(2, Math.floor(estRows / (totalSpecials + 1)))
     : Infinity;
 
+  // Whole-row special kinds unlocked at higher levels.
+  const specialRowKinds = [];
+  if (def.n >= SPECIAL_ROWS.white) specialRowKinds.push('white');
+  if (def.n >= SPECIAL_ROWS.black) specialRowKinds.push('black');
+  if (def.n >= SPECIAL_ROWS.tri) specialRowKinds.push('tri');
+
   while (t < spawnWindow) {
-    const rowFish = buildContiguousRow(rng, lanes, def, pool);
-    // Maybe convert the first fish in this row into a special.
-    let injectedSpecial = null;
-    if (totalSpecials > 0 && rowIndex > 0 && rowIndex % specialEveryRows === 0) {
-      injectedSpecial = takeSpecial(specialsLeft);
+    // Occasionally spawn a whole row of one special kind (same tri pattern).
+    let rowKind = null;
+    if (specialRowKinds.length && rowIndex > 0 && rng.chance(0.22)) {
+      rowKind = rng.pick(specialRowKinds);
     }
 
+    const rowFish = buildContiguousRow(rng, lanes, def, pool);
     const rowSpawns = [];
-    for (let li = 0; li < rowFish.length; li++) {
-      const { lane, color } = rowFish[li];
-      if (injectedSpecial && li === 0) {
-        rowSpawns.push(makeSpecialSpawn(t, lane, injectedSpecial, pool, rng));
-      } else {
-        rowSpawns.push({ t, lane, kind: 'normal', color, value: POINTS.normal });
+    if (rowKind) {
+      const bands = rowKind === 'tri' ? rng.shuffle(pool).slice(0, 3) : null;
+      for (const { lane } of rowFish) {
+        if (rowKind === 'tri') rowSpawns.push({ t, lane, kind: 'tri', bands: bands.slice(), value: POINTS.tri });
+        else rowSpawns.push({ t, lane, kind: rowKind, value: rowKind === 'white' ? POINTS.white : POINTS.black });
+      }
+    } else {
+      // Maybe convert the first fish in this row into a single special.
+      let injectedSpecial = null;
+      if (totalSpecials > 0 && rowIndex > 0 && rowIndex % specialEveryRows === 0) {
+        injectedSpecial = takeSpecial(specialsLeft);
+      }
+      for (let li = 0; li < rowFish.length; li++) {
+        const { lane, color } = rowFish[li];
+        if (injectedSpecial && li === 0) {
+          rowSpawns.push(makeSpecialSpawn(t, lane, injectedSpecial, pool, rng));
+        } else {
+          rowSpawns.push({ t, lane, kind: 'normal', color, value: POINTS.normal });
+        }
       }
     }
     for (const s of rowSpawns) spawns.push(s);
@@ -198,13 +219,17 @@ export function compileLevel(def) {
       if (!finalPicker.includes(o)) finalPicker.push(o);
     }
   }
+  // From L30, shuffle the picker so the colour buttons are in a random order.
+  if (def.n >= SHUFFLE_PICKER_FROM) {
+    finalPicker = rng.shuffle(finalPicker === picker ? picker.slice() : finalPicker);
+  }
 
   const maxScore = spawns.reduce((s, sp) => s + sp.value, 0);
   const passTarget = Math.ceil(maxScore * LEVEL.passPct);
   const twoStar = Math.ceil(maxScore * LEVEL.twoStarPct);
   const threeStar = Math.ceil(maxScore * LEVEL.threeStarPct);
 
-  return { n: def.n, lanes, pool, picker: finalPicker, spawns, maxScore, passTarget, twoStar, threeStar, seed: def.seed, duration, spawnWindow };
+  return { n: def.n, lanes, pool, picker: finalPicker, spawns, maxScore, passTarget, twoStar, threeStar, seed: def.seed, duration, spawnWindow, currents: def.currents || 0, coral: !!def.coral };
 }
 
 function pickRowLanes(rng, laneCount, sizeMin, sizeMax) {
