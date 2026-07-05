@@ -2,6 +2,11 @@
 
 All notable changes to Fish Friends.
 
+## [1.12.1] — 2026-07-05
+- **Current direction arrows:** water-current bands now show a scrolling row of
+  little translucent-blue arrows pointing the way the current flows, so the
+  direction (and each 15s flip) is obvious at a glance.
+
 ## [1.12.0] — 2026-07-05
 - **Water currents (from L23):** a subtle moving-water band in a middle row shoves
   the incoming (enemy) fish one lane sideways as they cross it, flipping direction

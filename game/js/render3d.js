@@ -62,16 +62,23 @@ export class Render3D {
       const geo = new THREE.PlaneGeometry(40, 0.9);
       const mat = new THREE.ShaderMaterial({
         transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-        uniforms: { uTime: { value: 0 }, uDir: { value: 1 }, uOpacity: { value: 0.22 } },
+        uniforms: { uTime: { value: 0 }, uDir: { value: 1 }, uOpacity: { value: 0.3 } },
         vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
         fragmentShader: `
           varying vec2 vUv; uniform float uTime; uniform float uDir; uniform float uOpacity;
           void main(){
-            float x = vUv.x * 26.0 - uTime * uDir * 1.6;
-            float stripe = smoothstep(0.35, 0.5, abs(fract(x) - 0.5));
-            float edge = smoothstep(0.0, 0.25, vUv.y) * smoothstep(1.0, 0.75, vUv.y);
-            float a = (0.35 + 0.65 * stripe) * edge * uOpacity;
-            gl_FragColor = vec4(0.6, 0.85, 1.0, a);
+            // vertical fade so the band blends into the water
+            float edge = smoothstep(0.0, 0.2, vUv.y) * smoothstep(1.0, 0.8, vUv.y);
+            // scrolling row of little triangle arrows pointing in the current direction
+            float cellW = 0.032;
+            float scroll = uTime * uDir * 0.024;
+            float fx = fract((vUv.x - scroll) / cellW);
+            float ax = uDir >= 0.0 ? fx : 1.0 - fx;          // mirror for left-flowing
+            float hh = clamp((0.72 - ax) / 0.62, 0.0, 1.0) * 0.34; // taper to the apex
+            float inArrow = (ax > 0.12 && abs(vUv.y - 0.5) < hh) ? 1.0 : 0.0;
+            float a = (0.06 + inArrow * 1.0) * edge * uOpacity;
+            vec3 col = mix(vec3(0.4, 0.65, 1.0), vec3(0.72, 0.9, 1.0), inArrow);
+            gl_FragColor = vec4(col, a);
           }`,
       });
       const mesh = new THREE.Mesh(geo, mat);
