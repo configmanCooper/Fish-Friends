@@ -2,6 +2,12 @@
 
 All notable changes to Fish Friends.
 
+## [1.10.0] — 2026-07-05
+- **Auto-updating + offline:** the service worker is now **network-first** — every
+  time you open the game online it pulls the freshest version (no more manual hard
+  refresh), and when you're **offline it falls back to the cached copy** so you can
+  still play what you've already loaded.
+
 ## [1.9.0] — 2026-07-05
 - **Install App button** on the main menu: on Android/desktop Chrome it appears
   when the browser offers installation and launches the native "Add to Home
