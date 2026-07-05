@@ -105,7 +105,7 @@ export const POINTS = {
 // Shop / power-ups.
 // ---------------------------------------------------------------------------
 export const PRICES = { ice: 2, shark: 3, rainbow: 5, squid: 6 };
-export const INV_CAP = 3;
+export const INV_CAP = 4;
 
 export const POWERUPS = {
   ice:     { id: 'ice',     name: 'Ice Cube',   icon: '🧊', price: PRICES.ice,     duration: 15 },

@@ -2,6 +2,16 @@
 
 All notable changes to Fish Friends.
 
+## [1.8.0] — 2026-07-05
+- **Friendlier copy:** pre-level hint now says "Touch, or touch and drag, on the
+  beach to draw fish…"; Ice Cube reads "all fish friends swim at half speed";
+  Rainbow reads "your fish become friends with fish of any color".
+- **Own up to 4** of each item (inventory cap 3 → 4).
+
+## [1.7.1] — 2026-07-05
+- **Shark Autodeploy checkbox** added directly to the Shark card in the shop,
+  synced with the Settings toggle.
+
 ## [1.7.0] — 2026-07-05
 - **No draw cooldown:** you can now create fish as fast as you want — the launch
   recharge is disabled and its bar is hidden. Levels re-paced accordingly (rows

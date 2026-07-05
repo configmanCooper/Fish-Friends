@@ -221,7 +221,7 @@ export class UI {
     }
     const demo = document.getElementById('pre-demo');
     const specials = new Set(level.spawns.map((s) => s.kind).filter((k) => k !== 'normal'));
-    let hint = 'Draw fish of the opposite color to make friends!';
+    let hint = 'Touch, or touch and drag, on the beach to draw fish of the opposite color to make friends!';
     if (specials.has('white')) hint = '⚪ White fish: hit twice with the SAME color.';
     if (specials.has('black')) hint = '⚫ Black fish: hit with a color, then its opposite.';
     if (specials.has('tri')) hint = '🌈 Tri fish: counter the FRONT band first, then back.';
@@ -332,11 +332,15 @@ export class UI {
       const btnLabel = godMode
         ? `Buy ${SF_SM}`
         : (owned >= INV_CAP ? 'Max' : (saveData.starfish >= p.price ? `Buy ${p.price}${SF_SM}` : `Need ${p.price - saveData.starfish} more ${SF_SM}`));
+      const autoRow = k === 'shark'
+        ? `<label class="shop-auto"><input type="checkbox" data-setting="autoShark" ${saveData.settings.autoShark ? 'checked' : ''}> Autodeploy</label>`
+        : '';
       card.innerHTML = `
         <div class="shop-icon">${p.icon}</div>
         <div class="shop-name">${p.name}</div>
         <div class="shop-desc">${shopDesc(k)}</div>
         <div class="shop-owned">Owned: ${owned}/${godMode ? '∞' : INV_CAP}</div>
+        ${autoRow}
         <button class="btn btn-small ${affordable ? 'btn-primary' : ''}" data-action="buy" data-item="${k}" ${affordable ? '' : 'disabled'}>
           ${btnLabel}
         </button>`;
@@ -346,8 +350,9 @@ export class UI {
 
   // ---- Settings ----------------------------------------------------------
   renderSettings(settings) {
+    const scope = document.getElementById('s-settings');
     for (const key of ['patterns', 'reducedMotion', 'mirror', 'sfx', 'music', 'autoShark']) {
-      const el = this.root.querySelector(`[data-setting="${key}"]`);
+      const el = scope.querySelector(`[data-setting="${key}"]`);
       if (el) el.checked = !!settings[key];
     }
     this.root.classList.toggle('mirror', !!settings.mirror);
@@ -372,9 +377,9 @@ function starStr(n) { let s = ''; for (let i = 0; i < 3; i++) s += sfSVG(13, i <
 
 function shopDesc(k) {
   return {
-    ice: '15s: all enemies at half speed.',
+    ice: '15s: all fish friends swim at half speed.',
     shark: 'Sweep 3 lanes, eat every fish for full points. Buy gives ×2.',
-    rainbow: '15s: your fish counter ANY color.',
+    rainbow: '15s: your fish become friends with fish of any color.',
     squid: '30s: eats interior lanes, +1 per 2 eaten.',
   }[k];
 }
