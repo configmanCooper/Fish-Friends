@@ -1,14 +1,13 @@
-// audio.js — tiny WebAudio synth SFX (no asset files). Unlocked on first gesture.
+// audio.js — WebAudio synth SFX + a looping mp3 music track. Unlocked on gesture.
 let ctx = null;
 let enabled = true;
-let musicGain = null;
 let musicOn = true;
-let musicNodes = [];
 
 export function setEnabled(v) { enabled = v; }
 export function setMusicEnabled(v) {
   musicOn = v;
   if (!v) stopMusic();
+  else playMusic();
 }
 
 export function unlock() {
@@ -62,35 +61,21 @@ export const sfx = {
   deny: () => tone(200, 0.08, 'sine', 0.06, 160),
 };
 
+// Background music: a looping mp3 track. Plays continuously across menu and
+// gameplay (started on the first navigation gesture); pauses when muted.
+let musicEl = null;
 export function playMusic(kind) {
-  if (!ctx || !musicOn) return;
-  stopMusic();
-  musicGain = ctx.createGain();
-  musicGain.gain.value = 0.05;
-  musicGain.connect(ctx.destination);
-  // simple ambient arpeggio loop
-  const scale = kind === 'game' ? [220, 277, 330, 440] : [196, 247, 294, 392];
-  let i = 0;
-  const step = () => {
-    if (!musicGain) return;
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = 'sine';
-    o.frequency.value = scale[i % scale.length] * (i % 8 < 4 ? 1 : 1.5);
-    const now = ctx.currentTime;
-    g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(0.5, now + 0.05);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
-    o.connect(g); g.connect(musicGain);
-    o.start(now); o.stop(now + 0.55);
-    i++;
-    musicNodes.push(setTimeout(step, 480));
-  };
-  step();
+  if (!musicOn) return;
+  if (!musicEl) {
+    musicEl = new Audio('assets/FishFriendsSong.mp3?v=1');
+    musicEl.loop = true;
+    musicEl.volume = 0.5;
+    musicEl.preload = 'auto';
+  }
+  if (musicEl.paused) { const p = musicEl.play(); if (p && p.catch) p.catch(() => {}); }
 }
 
 export function stopMusic() {
-  for (const t of musicNodes) clearTimeout(t);
-  musicNodes = [];
-  if (musicGain) { try { musicGain.disconnect(); } catch (e) {} musicGain = null; }
+  if (musicEl) { try { musicEl.pause(); } catch (e) {} }
 }
+

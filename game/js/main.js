@@ -52,7 +52,7 @@ class Game {
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.state === 'game' && !this.paused) this.pause();
     });
-    window.addEventListener('pointerdown', () => Audio.unlock(), { once: true });
+    window.addEventListener('pointerdown', () => { Audio.unlock(); Audio.playMusic('map'); }, { once: true });
     window.addEventListener('keydown', (e) => this._cheatKey(e));
     this._setupInstallPrompt();
 

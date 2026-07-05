@@ -2,6 +2,12 @@
 
 All notable changes to Fish Friends.
 
+## [1.14.0] — 2026-07-05
+- **Real music track:** replaced the synth loop with `FishFriendsSong.mp3`, playing
+  as looping background music across the menu and gameplay (starts on your first tap,
+  respects the Music setting). Audio is cached so it plays offline and isn't
+  re-downloaded on every visit.
+
 ## [1.13.1] — 2026-07-05
 - **Hazards start later:** water currents now begin at **Level 25** (two from L28),
   and the coral reef now begins at **Level 30**.
