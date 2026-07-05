@@ -339,27 +339,31 @@ class Game {
   _stopPlay() { this.paused = false; this.pendingShark = false; }
 
   // Auto-deploy a shark in a lane when an enemy is within ~1s of the bottom,
-  // if the setting is on and the player has a shark in inventory.
+  // if the setting is on and the player has a shark in inventory. Counts as the
+  // level's single shark use — at most one auto-deploy per level play (like a
+  // manual shark), and none if a shark was already used this level.
   _autoShark() {
     if (!this.save.settings.autoShark) return;
     const s = this.sim;
     if (!s || s.ended) return;
     if ((this.save.inventory.shark || 0) <= 0) return;
+    // Respect the per-level item limits (auto + manual share the 1-shark cap).
+    if (!this.deep) {
+      if (this.itemsUsedThisLevel.has('shark')) return;
+      if (this.itemUseCount >= 3) return;
+    }
     const covered = new Set();
     for (const sh of s.sharks) for (const l of sh.lanes) covered.add(l);
     for (const e of s.enemies) {
-      if ((this.save.inventory.shark || 0) <= 0) break;
       if (!e.alive || covered.has(e.lane)) continue;
       const spd = s.enemySpeed(e);
       if (spd <= 0 || e.y <= 0) continue;
       if (e.y / spd <= 1.0) {
         s.useShark(e.lane - 1);
-        this.save.inventory.shark = Math.max(0, (this.save.inventory.shark || 0) - 1);
-        Save.save(this.save);
-        this._renderDock();
+        this._markItemUsed('shark');   // this is your one shark for the level
+        this._consume('shark');
         Audio.sfx.shark();
-        const w = 3, l0 = Math.max(0, Math.min(e.lane - 1, s.lanes - w));
-        for (let i = 0; i < w; i++) covered.add(l0 + i);
+        break;                          // only one auto-deploy per level play
       }
     }
   }

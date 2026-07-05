@@ -423,6 +423,28 @@ function testSpecialRowsAndPicker() {
   ok([...l30.picker].sort().join() === [...ordered].sort().join(), 'L30 picker is a permutation of all counters');
 }
 
+// Level ends only when all enemy fish are off-screen; no spawns after the timer.
+function testNoEndUntilClear() {
+  const lvl = makeLevel([{ t: 0.1, lane: 0, kind: 'normal', color: 'blue', value: 1 }], { duration: 5 });
+  const sim = new Sim(lvl);
+  for (let i = 0; i < 60 * 6; i++) sim.tick(1 / 60); // run past the 5s timer
+  ok(!sim.ended, 'level not ended while an enemy is still on screen past the timer');
+  ok(sim.enemies.length === 1, 'enemy still descending after the timer');
+  for (let i = 0; i < 60 * 25 && !sim.ended; i++) sim.tick(1 / 60);
+  ok(sim.ended, 'level ends once all enemy fish are off the screen');
+}
+
+function testNoSpawnAfterTimer() {
+  const lvl = makeLevel([
+    { t: 0.1, lane: 0, kind: 'normal', color: 'blue', value: 1 },
+    { t: 999, lane: 1, kind: 'normal', color: 'blue', value: 1 }, // scheduled way past timer
+  ], { duration: 5 });
+  const sim = new Sim(lvl);
+  let maxEnemies = 0;
+  for (let i = 0; i < 60 * 8; i++) { sim.tick(1 / 60); maxEnemies = Math.max(maxEnemies, sim.enemies.length); }
+  ok(maxEnemies <= 1, 'no new enemy fish spawn after the timer ends');
+}
+
 // ---------------------------------------------------------------------------
 function main() {
   testColors();
@@ -452,6 +474,8 @@ function main() {
   testCoralRemovesPlayer();
   testCoralDisintegrates();
   testSpecialRowsAndPicker();
+  testNoEndUntilClear();
+  testNoSpawnAfterTimer();
 
   console.log(`\n${pass} passed, ${fail} failed`);
   if (fail) {

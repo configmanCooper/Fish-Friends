@@ -2,6 +2,14 @@
 
 All notable changes to Fish Friends.
 
+## [1.19.0] — 2026-07-05
+- **One shark per level, including auto-deploy:** an auto-deployed shark now
+  counts as your single shark for that level — it fires at most once per play, and
+  once a shark (auto or manual) is used no more can be used until the next play.
+- **Level ends only when the water is clear:** a level no longer ends the instant
+  the timer hits zero — it waits until every enemy fish is off the screen. No new
+  fish spawn after the timer ends, so the remaining ones just play out.
+
 ## [1.18.0] — 2026-07-05
 - **Faster early fish:** enemy ("friend") fish swim **10% faster before Level 20**.
 - **App icon tweak:** the blue fish's tail now crosses **over** the orange fish

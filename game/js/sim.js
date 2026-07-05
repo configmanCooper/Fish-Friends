@@ -268,6 +268,8 @@ export class Sim {
 
   spawnDue() {
     const sp = this.level.spawns;
+    // No new enemy fish are generated after the level timer ends.
+    if (this.time >= (this.level.duration || LEVEL.duration)) { this.spawnCursor = sp.length; return; }
     while (this.spawnCursor < sp.length && sp[this.spawnCursor].t <= this.time) {
       const s = sp[this.spawnCursor++];
       const f = {
@@ -454,9 +456,12 @@ export class Sim {
 
   checkEnd() {
     if (this.endless) return; // Game controls endless termination (life-based)
+    // The level ends only once every enemy fish is off the screen, and no new
+    // fish spawn after the timer ends. So: end when there are no enemies left
+    // AND either all scripted fish have spawned or the timer has run out.
     const timeUp = this.time >= (this.level.duration || LEVEL.duration);
-    const cleared = this.allSpawned() && this.enemies.length === 0;
-    if (timeUp || cleared) {
+    const noMoreSpawns = this.allSpawned() || timeUp;
+    if (noMoreSpawns && this.enemies.length === 0) {
       this.ended = true;
       const stars = this.starsForScore(this.score);
       this.emit('levelEnd', {
