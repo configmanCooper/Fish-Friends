@@ -2,6 +2,10 @@
 
 All notable changes to Fish Friends.
 
+## [1.19.1] — 2026-07-05
+- **App icon fix:** the blue fish's whole tail section (not just the fin tip) now
+  weaves over the orange fish, matching the orange tail — the two interlock evenly.
+
 ## [1.19.0] — 2026-07-05
 - **One shark per level, including auto-deploy:** an auto-deployed shark now
   counts as your single shark for that level — it fires at most once per play, and
