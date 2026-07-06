@@ -2,6 +2,10 @@
 
 All notable changes to Fish Friends.
 
+## [1.25.1] — 2026-07-06
+- **Harder god-mode code:** the cheat is now **`f1shyfr1ends`** (type it anywhere,
+  or enter it on the Codes screen) instead of the simple `fish`.
+
 ## [1.25.0] — 2026-07-06
 - **Seahorse Powers!** The Legacy menu now shows a big seahorse (brownish‑orange)
   in the corner with a **Powers** button. Each Seahorse Trophy lets you keep one

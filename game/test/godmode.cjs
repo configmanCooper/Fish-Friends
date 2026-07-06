@@ -22,10 +22,10 @@ function assert(c, m) { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) failur
   await page.waitForTimeout(300);
   assert(await page.evaluate(() => window.game.godMode === false), 'god mode starts OFF');
 
-  // type f i s h
-  for (const ch of ['f', 'i', 's', 'h']) { await page.keyboard.press(ch); }
+  // type f 1 s h y f r 1 e n d s
+  for (const ch of ['f', '1', 's', 'h', 'y', 'f', 'r', '1', 'e', 'n', 'd', 's']) { await page.keyboard.press(ch); }
   await page.waitForTimeout(150);
-  assert(await page.evaluate(() => window.game.godMode === true), 'typing "fish" in-game enables god mode');
+  assert(await page.evaluate(() => window.game.godMode === true), 'typing "f1shyfr1ends" in-game enables god mode');
 
   // go to map -> all levels unlocked, starfish ∞
   await page.evaluate(() => window.game.goToMap());
@@ -38,7 +38,7 @@ function assert(c, m) { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) failur
     hasStarfishSVG: !!document.querySelector('.star-chip .sf'),
   }));
   assert(map.starfishText.includes('∞'), 'god mode shows ∞ starfish on map');
-  assert(map.unlockedCount === 40, 'all 40 levels unlocked in god mode (got ' + map.unlockedCount + ')');
+  assert(map.unlockedCount === 50, 'all 50 levels unlocked in god mode (got ' + map.unlockedCount + ')');
   assert(map.lockedCount === 0, 'no locked levels in god mode');
   assert(!map.deepLocked, 'The Deep unlocked in god mode');
   assert(map.hasStarfishSVG, 'starfish icon (SVG) renders instead of star');
@@ -63,9 +63,9 @@ function assert(c, m) { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) failur
 
   // toggle off
   await page.evaluate(() => { window.game.openPreLevel(1); window.game.beginLevel(); });
-  for (const ch of ['f', 'i', 's', 'h']) { await page.keyboard.press(ch); }
+  for (const ch of ['f', '1', 's', 'h', 'y', 'f', 'r', '1', 'e', 'n', 'd', 's']) { await page.keyboard.press(ch); }
   await page.waitForTimeout(120);
-  assert(await page.evaluate(() => window.game.godMode === false), 'typing "fish" again toggles god mode OFF');
+  assert(await page.evaluate(() => window.game.godMode === false), 'typing "f1shyfr1ends" again toggles god mode OFF');
 
   console.log('\nerrors:', errors.length);
   for (const e of errors.slice(0, 8)) console.log('  ' + e);

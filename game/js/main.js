@@ -40,7 +40,7 @@ class Game {
     this.deepLife = 5;
     this.deepNextChunk = 0;
 
-    // god mode (cheat): type "fish" while in a level
+    // god mode (cheat): type "f1shyfr1ends" while in a level, or enter it in Codes
     this.godMode = false;
     this._cheatBuf = '';
 
@@ -90,11 +90,11 @@ class Game {
     if (btn) btn.style.display = 'none';
   }
 
-  // Detect the "fish" cheat sequence anywhere -> toggle god mode.
+  // Detect the "f1shyfr1ends" cheat sequence anywhere -> toggle god mode.
   _cheatKey(e) {
     if (!e.key || e.key.length !== 1) return;
-    this._cheatBuf = (this._cheatBuf + e.key.toLowerCase()).slice(-4);
-    if (this._cheatBuf === 'fish') this._toggleGod();
+    this._cheatBuf = (this._cheatBuf + e.key.toLowerCase()).slice(-12);
+    if (this._cheatBuf === 'f1shyfr1ends') this._toggleGod();
   }
   _toggleGod() {
     this.godMode = !this.godMode;
@@ -141,7 +141,7 @@ class Game {
     const code = (raw || '').trim().toLowerCase();
     const msg = document.getElementById('code-msg');
     const show = (text, ok) => { if (msg) { msg.textContent = text; msg.className = 'code-msg ' + (ok ? 'good' : 'bad'); } };
-    if (code === 'fish') {
+    if (code === 'f1shyfr1ends') {
       if (!this.godMode) this._toggleGod();
       else this.ui.toast('God mode already on');
       show('🐟 God mode activated!', true);

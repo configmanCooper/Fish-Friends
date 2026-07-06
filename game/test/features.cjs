@@ -19,7 +19,7 @@ function assert(c, m) { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) failur
   assert(await page.evaluate(() => getComputedStyle(document.getElementById('btn-deep')).display === 'none'), 'The Deep hidden on title when locked');
 
   // God mode from MAIN MENU (title)
-  for (const ch of ['f', 'i', 's', 'h']) await page.keyboard.press(ch);
+  for (const ch of ['f', '1', 's', 'h', 'y', 'f', 'r', '1', 'e', 'n', 'd', 's']) await page.keyboard.press(ch);
   await page.waitForTimeout(120);
   assert(await page.evaluate(() => window.game.godMode === true), 'god mode activates on main menu');
   assert(await page.evaluate(() => getComputedStyle(document.getElementById('btn-deep')).display !== 'none'), 'The Deep shows on title in god mode');
