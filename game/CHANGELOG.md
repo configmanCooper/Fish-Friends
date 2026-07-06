@@ -2,6 +2,18 @@
 
 All notable changes to Fish Friends.
 
+## [1.23.0] — 2026-07-06
+- **Prism Whale boss reworked.** The whale now lurks at the back as a single
+  two-lane creature (new top-down model, facing the beach) and **creeps one step
+  closer every 5 seconds you fail to hit it** with its opposite colour (or a
+  rainbow). Land **3 hits within 10 seconds to shove it back**; it also **strafes
+  one lane every 10 seconds**. Its final phase splits it **half-and-half** — you
+  must hit **both** sides with their own opposites within 5 seconds to damage it.
+  The fight has **no timer**: you **win** at 0 HP and **lose** if the whale reaches
+  the beach or **20 fish slip past you**. Anemone, currents and a reef are all
+  active (they don't affect the whale), and a steady stream of fish — including
+  white, black and tri-colour — keeps coming.
+
 ## [1.22.0] — 2026-07-06
 - **10 new levels + a boss (now 50 levels).** The campaign runs to Level 50, which
   is a 3-phase **Prism Whale** boss fight: the whale cycles colours (per-lane in

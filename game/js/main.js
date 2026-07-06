@@ -475,9 +475,14 @@ class Game {
         this.ui.updateHUD(0, Math.floor(this.deepDepth), this.deepLife, this.sim.cooldownProgress(), this.pendingShark);
         document.getElementById('hud-timer').textContent = `${Math.floor(this.deepDepth)}m`;
         document.getElementById('hud-score').textContent = `❤ ${this.deepLife}`;
+      } else if (this.level.kind === 'boss') {
+        this.ui.updateBossHud(this.sim);
+        const b = this.sim.boss;
+        document.getElementById('hud-timer').textContent = '🐋 Boss';
+        document.getElementById('hud-score').textContent = b ? `${b.maxHp - b.hp}/${b.maxHp}` : '';
       } else {
         this.ui.updateHUD(this.sim.time, this.sim.score, this.level.passTarget, this.sim.cooldownProgress(), this.pendingShark, this.level.duration);
-        this.ui.updateBossHud(this.sim.boss || null);
+        this.ui.updateBossHud(null);
       }
     }
     this.debug.frame(dt, this.render, inGame ? this.sim : null);

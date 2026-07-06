@@ -267,21 +267,27 @@ export class Sim {
     const w = Math.min(BOSS.lanesWide, this.lanes);
     const l0 = Math.floor((this.lanes - w) / 2);
     const pool = lvl.pool;
-    const startColor = pool[0];
     this.boss = {
-      hp, maxHp: hp, phase: 1,
-      l0, w, y: BOSS.y,
+      hp, maxHp: hp,
+      l0, w,
+      step: 0,                 // 0 = all the way back, BOSS.steps = at the beach
+      y: BOSS.backY,
+      phase: 1,
       colorIdx: 0,
-      cyclePeriod: BOSS.cycle.p1,
+      color: pool[0],
       cycleT: 0,
-      perLane: false,
+      advanceT: 0,             // seconds since the last correct hit
+      recentHits: [],          // timestamps of recent correct hits (retreat combo)
+      lateralT: BOSS.lateralEvery, // countdown to next left/right strafe
+      fishT: BOSS.fish.every,  // countdown to next descending fish row
     };
-    // One damage-shared segment per occupied lane; each is a normal enemy the
-    // collide system / bots handle, flagged boss so it holds station & shares HP.
+    // One damage-shared segment per occupied lane; each is an enemy the collide
+    // system / bots handle, flagged boss so it holds station & shares HP. Each
+    // carries its own struckAt (used by the half-and-half final phase).
     for (let i = 0; i < w; i++) {
       this.enemies.push({
-        id: fid(), lane: l0 + i, y: BOSS.y, kind: 'boss', boss: true,
-        color: startColor, alive: true, vulnerableAt: 0, weaved: new Set(),
+        id: fid(), lane: l0 + i, y: BOSS.backY, kind: 'boss', boss: true,
+        color: pool[0], alive: true, vulnerableAt: 0, struckAt: -999, weaved: new Set(),
       });
     }
     this.emit('bossSpawn', { hp, lanes: w });
@@ -289,46 +295,113 @@ export class Sim {
 
   bossSegments() { return this.enemies.filter((e) => e.boss && e.alive); }
 
+  _bossY() { const b = this.boss; return BOSS.backY - (b.step / BOSS.steps) * (BOSS.backY - BOSS.beachY); }
+
   updateBoss(dt) {
     const b = this.boss;
     if (!b || this.bossWon) return;
-    // Phase transitions by remaining HP.
+    const pool = this.level.pool;
+
+    // Phase by remaining HP. Final phase (3) splits the whale into two halves,
+    // each its own colour — you must hit BOTH halves' opposites within
+    // BOSS.splitWithin seconds to land damage.
     const frac = b.hp / b.maxHp;
-    let phase = 1;
-    if (frac <= BOSS.phaseAt.p3) phase = 3;
-    else if (frac <= BOSS.phaseAt.p2) phase = 2;
+    let phase = frac <= BOSS.phaseAt.p3 ? 3 : frac <= BOSS.phaseAt.p2 ? 2 : 1;
     if (phase !== b.phase) {
       b.phase = phase;
-      b.cyclePeriod = phase === 3 ? BOSS.cycle.p3 : phase === 2 ? BOSS.cycle.p2 : BOSS.cycle.p1;
-      b.perLane = (phase === 3);
+      if (phase === 3) this._recolorBoss(true, pool);
       this.emit('bossPhase', { phase });
     }
+
     // Colour cycle.
     b.cycleT += dt;
-    if (b.cycleT >= b.cyclePeriod) {
-      b.cycleT -= b.cyclePeriod;
-      const pool = this.level.pool;
+    if (b.cycleT >= BOSS.cyclePeriod) {
+      b.cycleT -= BOSS.cyclePeriod;
       b.colorIdx = (b.colorIdx + 1) % pool.length;
-      const segs = this.bossSegments();
-      if (b.perLane) {
-        // every lane gets its own colour
-        for (const s of segs) s.color = pool[this.rng.int(0, pool.length - 1)];
-      } else {
-        const c = pool[b.colorIdx];
-        for (const s of segs) s.color = c;
-      }
-      this.emit('bossCycle', { phase: b.phase });
+      this._recolorBoss(b.phase === 3, pool);
+      this.emit('bossCycle', {});
     }
-    // Gentle vertical bob (visual; also used by collide radius).
-    b.y = BOSS.y + Math.sin(this.time * 1.6) * BOSS.bob;
+
+    // Advance one step for every `advanceEvery` seconds without a correct hit.
+    b.advanceT += dt;
+    if (b.advanceT >= BOSS.advanceEvery) {
+      b.advanceT -= BOSS.advanceEvery;
+      b.step = Math.min(BOSS.steps, b.step + 1);
+      this.emit('bossAdvance', { step: b.step });
+    }
+
+    // Strafe one lane left/right every lateralEvery seconds (stay on the grid).
+    b.lateralT -= dt;
+    if (b.lateralT <= 0) {
+      b.lateralT += BOSS.lateralEvery;
+      const canLeft = b.l0 > 0;
+      const canRight = b.l0 + b.w <= this.lanes - 1;
+      let dir = 0;
+      if (canLeft && canRight) dir = this.rng.chance(0.5) ? -1 : 1;
+      else if (canLeft) dir = -1;
+      else if (canRight) dir = 1;
+      if (dir !== 0) {
+        b.l0 += dir;
+        const segs = this.bossSegments();
+        for (let i = 0; i < segs.length; i++) segs[i].lane = b.l0 + i;
+        this.emit('bossStrafe', { l0: b.l0, dir });
+      }
+    }
+
+    // Position (bob for life).
+    b.y = this._bossY() + Math.sin(this.time * 1.4) * 0.012;
     for (const s of this.bossSegments()) s.y = b.y;
-    this.score = b.maxHp - b.hp; // keep score == net boss progress every tick
+
+    // Descending fish (incl. occasional specials) keep coming — pure threat.
+    b.fishT -= dt;
+    if (b.fishT <= 0) { b.fishT += BOSS.fish.every; this._spawnBossFishRow(); }
+
+    this.score = b.maxHp - b.hp; // score == net whale damage
   }
 
-  // Boss collision: a player fish reaching a boss segment deals 1 damage if it
-  // counters the segment's current colour, or HEALS the boss by 1 if it's the
-  // wrong colour. This makes an always-wrong-colour player unable to win while
-  // a correct player grinds the boss down. Paced by a per-segment cooldown.
+  // Colour the whale: split=true gives each half its own (distinct) colour.
+  _recolorBoss(split, pool) {
+    const b = this.boss;
+    const segs = this.bossSegments();
+    if (!split) {
+      b.color = pool[b.colorIdx];
+      for (const s of segs) s.color = b.color;
+    } else {
+      const a = pool[b.colorIdx];
+      let c = pool[(b.colorIdx + Math.max(1, Math.floor(pool.length / 2))) % pool.length];
+      if (c === a && pool.length > 1) c = pool[(b.colorIdx + 1) % pool.length];
+      b.color = a;
+      for (let i = 0; i < segs.length; i++) segs[i].color = (i === 0) ? a : c;
+    }
+  }
+
+  _spawnBossFishRow() {
+    const rng = this.rng;
+    const size = Math.min(this.lanes, rng.int(BOSS.fish.rowMin, BOSS.fish.rowMax));
+    const start = rng.int(0, this.lanes - size);
+    const pool = this.level.pool;
+    // whole-row special sometimes
+    let rowKind = null;
+    const r = rng.next();
+    if (r < BOSS.fish.triChance) rowKind = 'tri';
+    else if (r < BOSS.fish.triChance + BOSS.fish.blackChance) rowKind = 'black';
+    else if (r < BOSS.fish.triChance + BOSS.fish.blackChance + BOSS.fish.whiteChance) rowKind = 'white';
+    const bands = rowKind === 'tri' ? rng.shuffle(pool.slice()).slice(0, 3) : null;
+    const color = rng.pick(pool);
+    for (let i = 0; i < size; i++) {
+      const lane = start + i;
+      const f = { id: fid(), lane, y: FIELD.topSpawnY, alive: true, weaveDir: rng.chance(0.5) ? 1 : -1, minion: true };
+      if (rowKind === 'tri') { f.kind = 'tri'; f.bands = bands.slice(); f.phase = 0; }
+      else if (rowKind === 'white' || rowKind === 'black') { f.kind = rowKind; f.phase = 0; f.color = null; }
+      else { f.kind = 'normal'; f.color = color; }
+      this.enemies.push(f);
+      this.emit('spawn', { id: f.id, lane, kind: f.kind });
+    }
+  }
+
+  // Boss collision: a player fish reaching the whale with its OPPOSITE colour (or
+  // rainbow) deals 1 damage and resets the advance timer; 3 hits within
+  // retreatWindow shove it back a step. Wrong colours do nothing (no heal).
   bossCollide() {
     const b = this.boss;
     if (!b || this.bossWon) return;
@@ -336,17 +409,43 @@ export class Sim {
     for (const seg of this.enemies) {
       if (!seg.boss || !seg.alive) continue;
       if (this.time < seg.vulnerableAt) continue; // inert -> let fish pass
-      // nearest player fish in this lane within the body band
+      // nearest CORRECT-colour player fish in this lane within the body band
+      // (wrong-colour fish just weave past the whale with no effect).
       let p = null, best = Infinity;
       for (const q of this.players) {
         if (!q.alive || q.lane !== seg.lane) continue;
+        if (!playerActsOn(q.color, seg)) continue;
         const d = Math.abs(q.y - seg.y);
         if (d < R && d < best) { best = d; p = q; }
       }
       if (!p) continue;
-      p.alive = false; // fish consumed on contact
+      p.alive = false; // correct fish consumed
       seg.vulnerableAt = this.time + BOSS.segCooldown;
-      if (playerActsOn(p.color, seg)) {
+      // Any correct hit resets the creep timer and counts toward the retreat combo.
+      b.advanceT = 0;
+      b.recentHits.push(this.time);
+      b.recentHits = b.recentHits.filter((t) => this.time - t <= BOSS.retreatWindow);
+      if (b.recentHits.length >= BOSS.retreatHits) {
+        b.recentHits.length = 0;
+        if (b.step > 0) { b.step = Math.max(0, b.step - 1); this.emit('bossRetreat', { step: b.step }); }
+      }
+      // Damage: phases 1-2 damage per hit; phase 3 needs BOTH halves struck
+      // (each with its own opposite) within BOSS.splitWithin seconds.
+      let dealt = false;
+      if (b.phase < 3) {
+        dealt = true;
+      } else {
+        seg.struckAt = this.time;
+        const allStruck = this.bossSegments().every((s) => this.time - s.struckAt <= BOSS.splitWithin);
+        if (allStruck) {
+          dealt = true;
+          for (const s of this.bossSegments()) s.struckAt = -999; // reset the combo
+          this.emit('bossSplitBreak', {});
+        } else {
+          this.emit('bossSideHit', { lane: seg.lane });
+        }
+      }
+      if (dealt) {
         b.hp = Math.max(0, b.hp - 1);
         this.emit('bossHit', { lane: seg.lane, hp: b.hp, maxHp: b.maxHp });
         if (b.hp <= 0) {
@@ -354,11 +453,8 @@ export class Sim {
           for (const s of this.enemies) if (s.boss) s.alive = false;
           this.emit('bossDefeated', {});
         }
-      } else {
-        b.hp = Math.min(b.maxHp, b.hp + 1); // wrong colour reinvigorates the whale
-        this.emit('bossHeal', { lane: seg.lane, hp: b.hp });
+        this.score = b.maxHp - b.hp;
       }
-      this.score = b.maxHp - b.hp; // score == net damage that stuck
     }
   }
   cooldownProgress() {
@@ -692,18 +788,22 @@ export class Sim {
     if (this.endless) return; // Game controls endless termination (life-based)
     const dur = this.level.duration || LEVEL.duration;
     const timeUp = this.time >= dur;
-    // Boss level: win the instant the boss is defeated; lose if the clock runs
-    // out with the boss still alive.
+    // Boss level: WIN when the whale's HP hits 0; LOSE if it reaches the beach
+    // or 20 fish slip past you. No timer.
     if (this.level.kind === 'boss') {
-      if (this.bossWon || timeUp) {
-        if (!this.bossWon) for (const s of this.enemies) if (s.boss) s.alive = false;
+      const b = this.boss;
+      const beached = b && b.step >= BOSS.steps;
+      const swarmed = this.leaks >= BOSS.maxLeaks;
+      if (this.bossWon || beached || swarmed) {
+        for (const s of this.enemies) if (s.boss) s.alive = false;
         this.enemies = this.enemies.filter((e) => e.alive);
         this.ended = true;
-        const stars = this.starsForScore(this.score);
+        const stars = this.bossWon ? 3 : 0; // boss is binary: win = 3★, lose = 0★
         this.emit('levelEnd', {
           score: this.score, maxScore: this.maxScore, stars,
           passTarget: this.level.passTarget, passed: this.bossWon,
           boss: true, bossWon: this.bossWon,
+          loseReason: this.bossWon ? null : (beached ? 'beach' : 'swarm'),
         });
       }
       return;
@@ -737,8 +837,13 @@ export class Sim {
       enemies: this.enemies, players: this.players, sharks: this.sharks,
       effects: this.effects, cooldown: this.cooldownProgress(),
       currents: this.currents, coral: this.coral, anemone: this.anemone,
-      boss: this.boss ? { hp: this.boss.hp, maxHp: this.boss.maxHp, phase: this.boss.phase,
-                          l0: this.boss.l0, w: this.boss.w, y: this.boss.y, won: this.bossWon } : null,
+      boss: this.boss ? {
+        hp: this.boss.hp, maxHp: this.boss.maxHp, phase: this.boss.phase,
+        l0: this.boss.l0, w: this.boss.w, y: this.boss.y, step: this.boss.step,
+        won: this.bossWon,
+        colors: this.bossSegments().map((s) => s.color),
+        leaks: this.leaks, maxLeaks: BOSS.maxLeaks,
+      } : null,
     };
   }
 }

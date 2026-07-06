@@ -112,7 +112,7 @@ function buildLevelDefs(prestige = 0) {
       maxDistinct: Math.min(3, Math.max(1, colors - 1)),
       specials: isBoss ? {} : specialsFor(n, prestige),
       newThing: isIntroLevel(n),
-      duration: isBoss ? BOSS.duration : (n === 1 ? 45 : undefined),
+      duration: isBoss ? undefined : (n === 1 ? 45 : undefined),
       currents: isBoss ? 0 : (n >= curTwoFrom ? 2 : (n >= curFrom ? 1 : 0)),
       coral: isBoss ? false : (n >= coralFrom),
       anemone: isBoss ? false : (n >= anemFrom),
@@ -266,52 +266,30 @@ export function compileLevel(def) {
 }
 
 // ---------------------------------------------------------------------------
-// Boss level (L50): the Prism Whale. maxScore == boss HP (the only positive
-// score); minions are threat-only (0 points, -1 if they leak). The Sim spawns
-// the boss segments itself from level.kind/bossHp.
+// Boss level (L50): the Prism Whale. maxScore == boss HP; score == net damage.
+// No spawn table — the Sim procedurally spits out threat fish (incl. white/black/
+// tri) and drives the whale. Anemone, currents and a reef are all active (they
+// don't affect the whale). No timer: win at HP 0, lose at the beach or 20 leaks.
 // ---------------------------------------------------------------------------
 export function compileBossLevel(def) {
   const rng = makeRng(def.seed);
   const pool = poolFor(def.colorsInPlay); // full pairs (even) => opposite-closed
   let picker = pickerFor(pool);
-  // close under opposite so any boss colour's counter is always selectable
+  // close under opposite so any whale colour's counter is always selectable
   for (const c of picker.slice()) { const o = opposite(c); if (!picker.includes(o)) picker.push(o); }
-  const lanes = def.lanes;
-  const duration = def.duration || BOSS.duration;
-  const spawnWindow = Math.max(10, duration - 10);
+  picker = rng.shuffle(picker.slice()); // late-game shuffled picker
   const hp = def.bossHp || BOSS.hp;
-
-  // Threat minions: normal fish rows every BOSS.minion.every seconds, avoiding
-  // the center boss lanes so they read as "adds" flanking the whale.
-  const spawns = [];
-  const w = Math.min(BOSS.lanesWide, lanes);
-  const bl0 = Math.floor((lanes - w) / 2);
-  const bossLanes = new Set();
-  for (let i = 0; i < w; i++) bossLanes.add(bl0 + i);
-  const sideLanes = [];
-  for (let l = 0; l < lanes; l++) if (!bossLanes.has(l)) sideLanes.push(l);
-  let t = 4;
-  while (t < spawnWindow) {
-    const size = Math.min(sideLanes.length, rng.int(1, 2));
-    const chosen = rng.shuffle(sideLanes.slice()).slice(0, size).sort((a, b) => a - b);
-    const color = rng.pick(pool);
-    for (const lane of chosen) {
-      spawns.push({ t, lane, kind: 'normal', color, value: 0, minion: true });
-    }
-    t += BOSS.minion.every / FISH_DENSITY;
-  }
-  spawns.sort((a, b) => a.t - b.t);
-
-  // Shuffle picker order (boss is late-game) for consistency with L30+ rule.
-  picker = rng.shuffle(picker.slice());
-
   const maxScore = hp;
   return {
-    n: def.n, kind: 'boss', bossHp: hp, lanes, pool, picker, spawns,
+    n: def.n, kind: 'boss', bossHp: hp, lanes: def.lanes, pool, picker,
+    spawns: [],               // fish are spawned procedurally by the Sim
     maxScore, passTarget: Math.ceil(maxScore * LEVEL.passPct),
     twoStar: Math.ceil(maxScore * LEVEL.twoStarPct),
     threeStar: Math.ceil(maxScore * LEVEL.threeStarPct),
-    seed: def.seed, duration, spawnWindow, currents: 0, coral: false, anemone: false,
+    seed: def.seed,
+    duration: 100000,         // effectively no timer (hazards need a finite number)
+    spawnWindow: 100000,
+    currents: 1, coral: true, anemone: true, // all hazards active vs the fish
   };
 }
 

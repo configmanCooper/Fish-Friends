@@ -61,6 +61,7 @@ export class Render3D {
     this._buildCurrents();
     this._buildCoral();
     this._buildAnemone();
+    this._buildWhale();
     this.fx = new ParticleFX(this.scene);
     this.floaters = new Floaters(this.scene);
 
@@ -153,6 +154,79 @@ export class Render3D {
     this.anemoneGroup = group;
     this.anemoneX = null;
     this.scene.add(group);
+  }
+
+  _buildWhale() {
+    // Top-down whale spanning two lanes, head toward the beach (-y). Two body
+    // halves so the final phase can show a distinct colour on each side.
+    const group = new THREE.Group();
+    const bodyMat = (hex) => new THREE.MeshLambertMaterial({ color: hex });
+    const half = (sign) => {
+      const g = new THREE.SphereGeometry(0.5, 20, 16);
+      const m = new THREE.Mesh(g, bodyMat(0x2f7be6));
+      m.scale.set(0.52, 0.95, 0.42);
+      m.position.x = sign * 0.24;
+      return m;
+    };
+    this.whaleLeft = half(-1);
+    this.whaleRight = half(1);
+    group.add(this.whaleLeft, this.whaleRight);
+
+    this.whaleTrim = [];
+    // tail flukes at the back (+y)
+    for (const s of [-1, 1]) {
+      const f = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), bodyMat(0x2a6fd0));
+      f.scale.set(0.34, 0.16, 0.08);
+      f.position.set(s * 0.28, 0.92, 0);
+      f.rotation.z = s * 0.5;
+      group.add(f); this.whaleTrim.push(f);
+    }
+    // pectoral fins mid-body
+    for (const s of [-1, 1]) {
+      const f = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), bodyMat(0x2a6fd0));
+      f.scale.set(0.3, 0.5, 0.08);
+      f.position.set(s * 0.52, 0.02, 0);
+      f.rotation.z = s * 0.7;
+      group.add(f); this.whaleTrim.push(f);
+    }
+    // eyes near the head (-y)
+    this.whaleEyes = [];
+    for (const s of [-1, 1]) {
+      const e = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), new THREE.MeshBasicMaterial({ color: 0x101820 }));
+      e.scale.setScalar(0.055);
+      e.position.set(s * 0.2, -0.55, 0.28);
+      group.add(e); this.whaleEyes.push(e);
+    }
+    group.visible = false;
+    group.renderOrder = 3;
+    this.whaleGroup = group;
+    this.whaleX = null;
+    this.scene.add(group);
+  }
+
+  _updateWhale(sim) {
+    const g = this.whaleGroup;
+    const b = (sim && !sim.ended && !sim.bossWon) ? sim.boss : null;
+    if (!b) { if (g.visible) g.visible = false; this.whaleX = null; return; }
+    const segs = sim.bossSegments();
+    const hexOf = (id) => (COLORS[id] ? COLORS[id].hex : 0x2f7be6);
+    const cL = hexOf(segs[0] ? segs[0].color : b.color);
+    const cR = hexOf(segs[1] ? segs[1].color : (segs[0] ? segs[0].color : b.color));
+    this.whaleLeft.material.color.setHex(cL);
+    this.whaleRight.material.color.setHex(cR);
+    // trims: darkened blend of the two sides
+    const trim = new THREE.Color(cL).lerp(new THREE.Color(cR), 0.5).multiplyScalar(0.72);
+    for (const t of this.whaleTrim) t.material.color.copy(trim);
+
+    const laneW = this._laneW();
+    const targetX = (this.worldX(b.l0) + this.worldX(b.l0 + b.w - 1)) / 2;
+    if (this.whaleX === null) this.whaleX = targetX;
+    else this.whaleX += (targetX - this.whaleX) * Math.min(1, 0.14); // slide on strafe
+    const scale = b.w * laneW * 0.95;
+    g.visible = true;
+    g.position.set(this.whaleX, this.worldY(b.y), 0.4);
+    g.scale.setScalar(scale);
+    g.rotation.z = Math.sin(this.time * 1.2) * 0.05; // gentle sway
   }
 
   _buildShark() {
@@ -422,10 +496,15 @@ export class Render3D {
         this.fx.spawn(this.worldX(e.lane), this.worldY(0.5), 0.6, hex, { count: 12, speed: 0.7, size: 6 });
         this.floaters.spawn(this.worldX(e.lane), this.worldY(0.5), 1, '✦');
       } else if (e.type === 'bossHit') {
-        this.fx.spawn(this.worldX(e.lane), this.worldY(0.34), 0.6, 0xffef9a, { count: 10, speed: 0.9 });
-        this.floaters.spawn(this.worldX(e.lane), this.worldY(0.34), 1, '-1');
-      } else if (e.type === 'bossHeal') {
-        this.fx.spawn(this.worldX(e.lane), this.worldY(0.34), 0.6, 0x6affa0, { count: 8, speed: 0.6 });
+        const wy = this.whaleGroup && this.whaleGroup.visible ? this.whaleGroup.position.y : this.worldY(0.6);
+        this.fx.spawn(this.worldX(e.lane), wy, 0.6, 0xffef9a, { count: 10, speed: 0.9 });
+        this.floaters.spawn(this.worldX(e.lane), wy, 1, '-1');
+      } else if (e.type === 'bossSplitBreak') {
+        const wy = this.whaleGroup && this.whaleGroup.visible ? this.whaleGroup.position.y : this.worldY(0.6);
+        this.fx.spawn(this.whaleGroup.position.x, wy, 0.7, 0xfff0a0, { count: 16, speed: 1.1 });
+      } else if (e.type === 'bossSideHit') {
+        const wy = this.whaleGroup && this.whaleGroup.visible ? this.whaleGroup.position.y : this.worldY(0.6);
+        this.fx.spawn(this.worldX(e.lane), wy, 0.5, 0xbfe8ff, { count: 5, speed: 0.5, size: 5 });
       } else if (e.type === 'bossDefeated') {
         for (let i = 0; i < 6; i++) this.fx.spawn(this.worldX(Math.floor(this.laneCount / 2)) + (Math.random() - 0.5) * 2, this.worldY(0.4), 0.8, 0xffe37a, { count: 22, speed: 1.4, life: 1.1 });
       }
@@ -472,6 +551,7 @@ export class Render3D {
     this._updateCurrents(sim);
     this._updateCoral(sim);
     this._updateAnemone(sim);
+    this._updateWhale(sim);
     this.fx.update(dt);
     this.floaters.update(dt);
     this.renderer.render(this.scene, this.camera);
@@ -648,7 +728,7 @@ export class Render3D {
 
     if (sim && !sim.ended) {
       for (const e of sim.enemies) {
-        if (e.kind === 'tri') continue;
+        if (e.kind === 'tri' || e.kind === 'boss') continue; // tri + whale drawn separately
         let colorId, patternId = 0, scale = 0.62;
         if (e.kind === 'white') {
           if (e.phase === 0) { colorId = 0xf2f6ff; patternId = 0; scale = 0.66; }
@@ -656,8 +736,6 @@ export class Render3D {
         } else if (e.kind === 'black') {
           if (e.phase === 0) { colorId = 0x222630; patternId = 0; scale = 0.66; }
           else { colorId = e.color; patternId = patternForColor[e.color] || 0; }
-        } else if (e.kind === 'boss') {
-          colorId = e.color; patternId = patternForColor[e.color] || 0; scale = 1.5;
         } else {
           colorId = e.color; patternId = patternForColor[e.color] || 0;
         }

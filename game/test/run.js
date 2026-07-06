@@ -252,6 +252,13 @@ function testLevelValidator() {
     const lvl = compileLevel(def);
     ok(lvl.maxScore > 0, `L${def.n} maxScore > 0`);
     eq(lvl.passTarget, Math.ceil(lvl.maxScore * 0.5), `L${def.n} passTarget = 50%`);
+    // The boss level has no scripted spawn table (fish are procedural) and no
+    // timer, so skip the spawn-window / APM checks.
+    if (def.kind === 'boss') {
+      ok(lvl.spawns.length === 0, `L${def.n} boss has no scripted spawns`);
+      for (const c of lvl.picker) ok(lvl.picker.includes(opposite(c)), `L${def.n} boss picker closed under opposite (${c})`);
+      continue;
+    }
     // spawn window (per-level)
     const lastT = lvl.spawns[lvl.spawns.length - 1].t;
     ok(lastT <= lvl.spawnWindow + 0.001, `L${def.n} last spawn <= ${lvl.spawnWindow}s (got ${lastT.toFixed(1)})`);
@@ -453,20 +460,21 @@ function testBossLevel() {
   ok(def && def.kind === 'boss', 'L50 is a boss level');
   const lvl = compileLevel(def);
   eq(lvl.maxScore, def.bossHp, 'boss maxScore == boss HP');
-  ok(lvl.spawns.length > 0, 'boss level has threat minions');
+  ok(lvl.spawns.length === 0, 'boss level fish are procedural (no scripted spawns)');
+  ok(lvl.anemone && lvl.coral && lvl.currents >= 1, 'boss level has anemone, coral and current hazards');
 
   const perfect = runBot(new Sim(compileLevel(def)), perfectBot);
-  ok(perfect.stars >= 3, `boss PERFECT bot 3★ (score ${perfect.score}/${perfect.maxScore})`);
-  const pw = perfect.events.filter((e) => e.type === 'bossDefeated').length;
-  ok(pw === 1, 'boss defeated by perfect bot');
+  ok(perfect.stars >= 3, `boss PERFECT bot wins 3★ (score ${perfect.score}/${perfect.maxScore})`);
+  ok(perfect.events.filter((e) => e.type === 'bossDefeated').length === 1, 'perfect bot defeats the whale');
+  ok(perfect.events.some((e) => e.type === 'bossSplitBreak'), 'perfect bot triggers the final split phase');
 
   const nul = runBot(new Sim(compileLevel(def)), nullBot);
   eq(nul.stars, 0, 'boss NULL bot fails');
-  ok(nul.events.every((e) => e.type !== 'bossDefeated'), 'boss survives the do-nothing bot');
+  ok(nul.events.some((e) => e.type === 'levelEnd' && e.loseReason === 'beach'), 'whale reaches the beach against a do-nothing bot');
 
   const wrong = runBot(new Sim(compileLevel(def)), greedyWrongBot);
-  eq(wrong.stars, 0, 'boss GREEDY-WRONG bot fails (heals the whale)');
-  ok(wrong.events.every((e) => e.type !== 'bossDefeated'), 'wrong-colour bot never defeats the boss');
+  eq(wrong.stars, 0, 'boss GREEDY-WRONG bot fails');
+  ok(wrong.events.every((e) => e.type !== 'bossDefeated'), 'wrong-colour bot never defeats the whale');
 }
 
 function testAnemoneShift() {

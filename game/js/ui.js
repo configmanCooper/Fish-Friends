@@ -251,17 +251,19 @@ export class UI {
     if (legBtn) legBtn.style.display = legacyVisible ? '' : 'none';
   }
 
-  // Boss HP bar (shown only during the boss level).
-  updateBossHud(boss) {
+  // Boss HP bar (shown only during the boss level). Pass the Sim (or null).
+  updateBossHud(sim) {
     const hud = document.getElementById('boss-hud');
     if (!hud) return;
+    const boss = sim && sim.boss;
     if (!boss) { hud.style.display = 'none'; return; }
     hud.style.display = '';
     const frac = boss.maxHp > 0 ? Math.max(0, boss.hp / boss.maxHp) : 0;
     const fill = document.getElementById('boss-hpfill');
     if (fill) fill.style.width = (frac * 100).toFixed(1) + '%';
     const name = document.getElementById('boss-name');
-    if (name) name.textContent = `🐋 Prism Whale — Phase ${boss.phase}`;
+    const leaks = sim.leaks || 0, maxLeaks = 20;
+    if (name) name.textContent = `🐋 Prism Whale — Phase ${boss.phase}  ·  🐟 ${Math.max(0, maxLeaks - leaks)} left`;
   }
 
   // ---- Legacy menu -------------------------------------------------------
@@ -406,7 +408,8 @@ export class UI {
   renderResults(res) {
     const isBoss = !!res.boss;
     document.getElementById('res-title').textContent = isBoss
-      ? (res.bossWon ? '🐋 The Prism Whale is at peace!' : 'The Whale endures…')
+      ? (res.bossWon ? '🐋 The Prism Whale is at peace!'
+        : (res.loseReason === 'beach' ? 'The whale reached the beach…' : 'Too many fish slipped past…'))
       : (res.passed ? 'Level Complete!' : 'The current was strong…');
     const pct = res.maxScore ? Math.min(1, res.score / res.maxScore) : 0;
     document.getElementById('res-fill').style.width = Math.round(pct * 100) + '%';

@@ -213,17 +213,29 @@ export const ANEMONE = {
 // colour-cycle speed; the final phase gives every lane its own colour.
 // ---------------------------------------------------------------------------
 export const BOSS = {
-  hp: 60,                       // total hits to defeat (base; +12 per prestige)
-  hpPerPrestige: 12,
-  duration: 150,                // boss level clock (seconds)
-  lanesWide: 5,                 // number of body segments (center lanes)
-  y: 0.34,                      // low body => short travel so shots land fresh
-  bob: 0.015,                   // vertical bob amplitude
-  segCooldown: 0.9,             // seconds a segment is inert after any contact
-  hitRadius: 0.07,              // contact half-height (big body)
-  cycle: { p1: 4.5, p2: 3.4, p3: 2.4 }, // colour-cycle period per phase (s)
-  phaseAt: { p2: 0.66, p3: 0.33 },      // hp fraction thresholds for phases 2 & 3
-  minion: { every: 6, speedMult: 1.0 }, // spawn a minion row every N seconds
+  hp: 80,                       // total hits to defeat (base; +15 per prestige)
+  hpPerPrestige: 15,
+  lanesWide: 2,                 // whale spans two lanes
+  backY: 0.8,                   // furthest-back position (start)
+  beachY: 0.14,                 // reaching here = you lose
+  steps: 8,                     // discrete advance steps from back to beach
+  hitRadius: 0.11,              // contact half-height (big body)
+  segCooldown: 0.55,            // seconds a lane is inert after a contact
+  cyclePeriod: 6.0,             // colour-cycle period (seconds) — slow so shots land fresh
+  phaseAt: { p2: 0.66, p3: 0.33 }, // hp-fraction thresholds for phases 2 & 3
+  splitWithin: 5,               // final phase: hit BOTH halves' opposites within this
+  advanceEvery: 5,              // advances one step per this many seconds without a hit
+  lateralEvery: 10,             // strafes one lane left/right every this many seconds
+  retreatHits: 3,               // hits needed…
+  retreatWindow: 10,            // …within this many seconds to shove it back a step
+  maxLeaks: 20,                 // this many fish past you = you lose
+  fish: {                       // descending fish while you fight the whale
+    every: 2.4,                 // seconds between fish rows
+    rowMin: 1, rowMax: 3,
+    whiteChance: 0.10,
+    blackChance: 0.10,
+    triChance: 0.08,
+  },
 };
 
 // ---------------------------------------------------------------------------
