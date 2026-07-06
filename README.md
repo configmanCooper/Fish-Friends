@@ -48,5 +48,44 @@ node test/run.js         # 2600+ headless assertions: units, level validator,
 
 Browser tests (`test/*.cjs`) drive the real game in Chromium via `playwright-core`.
 
+## Privacy Policy
+
+**Publisher:** Cooper Unlimited Games · **Effective date:** July 6, 2026 · **Contact:** rocmat21@gmail.com
+
+Fish Friends does not collect, transmit, store on any server, or share any
+personal information. The game runs entirely on your device and can be played
+completely offline.
+
+- **Information we collect: none.** Fish Friends does not collect or process any
+  personal data. It does not ask for your name, email, location, or contacts, and
+  has no user accounts. It uses no analytics, advertising, tracking technologies,
+  cookies, or third‑party data‑collecting SDKs.
+- **Data stored on your device.** The app saves your game progress and settings
+  (level completion, starfish, options) **locally on your device only**. This
+  information never leaves your device and is used solely to let you continue
+  playing. You can remove it at any time by clearing the app's data or
+  uninstalling the app.
+- **No accounts, ads, or purchases.** There is no sign‑in, no advertising, and no
+  in‑app purchases. The app is a one‑time purchase.
+- **Network use.** The game requires no internet connection and does not send or
+  receive personal data over the network. All game content is included in the app.
+- **Children's privacy.** Fish Friends is suitable for all ages and does not
+  knowingly collect any personal information from anyone, including children.
+  Because the app collects no data, no parental consent is required and there is
+  nothing to disclose under COPPA or GDPR.
+- **Third parties.** We do not share, sell, or disclose any information to third
+  parties, because we do not collect any.
+- **Security.** No personal data is collected or transmitted, so there is none on
+  a server to secure. Any locally stored game data is protected by your device's
+  own security.
+- **Your rights.** As we hold no personal data about you, there is nothing to
+  access, correct, export, or delete on our side. Data on your device is fully
+  under your control.
+- **Changes to this policy.** If this policy changes, we will update the effective
+  date above and post the revised policy here.
+
+Questions about this policy can be sent to **Cooper Unlimited Games —
+rocmat21@gmail.com**.
+
 ## License
 All rights reserved (personal project).
