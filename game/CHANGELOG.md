@@ -2,6 +2,12 @@
 
 All notable changes to Fish Friends.
 
+## [1.20.0] — 2026-07-05
+- **Microsoft Store ready:** upgraded the web manifest to store grade (id,
+  categories, full 48→512 icon set + maskable icons, gameplay screenshots,
+  language/scope), added a privacy policy page, and produced a Store submission
+  kit (packaged separately) for PWABuilder → Microsoft Store.
+
 ## [1.19.1] — 2026-07-05
 - **App icon fix:** the blue fish's whole tail section (not just the fin tip) now
   weaves over the orange fish, matching the orange tail — the two interlock evenly.

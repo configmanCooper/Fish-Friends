@@ -1,15 +1,35 @@
 {
+  "id": "/Fish-Friends/game/",
   "name": "Fish Friends",
   "short_name": "Fish Friends",
-  "description": "Match opposite-colored fish and send them swimming off together.",
-  "start_url": "./index.html",
+  "description": "Match opposite-colored fish and send them swimming off together as friends. Drag on the seabed to draw fish, counter each color with its opposite, and clear 40 hand-crafted levels plus an endless deep-sea mode. Beat levels to earn starfish and spend them on power-ups: an ice cube, a hungry shark, a rainbow shimmer, and a giant squid.",
+  "start_url": "index.html",
+  "scope": ".",
   "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
   "orientation": "portrait",
   "background_color": "#0a3a66",
   "theme_color": "#0a3a66",
+  "lang": "en-US",
+  "dir": "ltr",
+  "categories": ["games", "entertainment", "kids"],
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "icons/icon-48.png",  "sizes": "48x48",   "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-72.png",  "sizes": "72x72",   "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-96.png",  "sizes": "96x96",   "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-128.png", "sizes": "128x128", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-144.png", "sizes": "144x144", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-256.png", "sizes": "256x256", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-384.png", "sizes": "384x384", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [
+    { "src": "screenshots/1-title.png",    "sizes": "720x1280", "type": "image/png", "form_factor": "narrow", "label": "Title screen" },
+    { "src": "screenshots/2-levels.png",   "sizes": "720x1280", "type": "image/png", "form_factor": "narrow", "label": "Choose a level" },
+    { "src": "screenshots/3-gameplay.png", "sizes": "720x1280", "type": "image/png", "form_factor": "narrow", "label": "Match opposite colors" },
+    { "src": "screenshots/4-shop.png",     "sizes": "720x1280", "type": "image/png", "form_factor": "narrow", "label": "Spend starfish in the shop" }
   ]
 }
