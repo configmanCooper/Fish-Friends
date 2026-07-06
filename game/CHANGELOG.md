@@ -2,6 +2,11 @@
 
 All notable changes to Fish Friends.
 
+## [1.24.1] — 2026-07-06
+- **Redrawn seahorse trophy** — the Legacy Seahorse Trophy icon is now a proper
+  filled seahorse silhouette (trumpet snout, crowned spiky head, dorsal fin,
+  coiled tail) matching a real seahorse.
+
 ## [1.24.0] — 2026-07-06
 - **Real seahorse trophy icon.** The Legacy menu's Seahorse Trophies now use a
   hand-drawn SVG seahorse (matching the starfish style) instead of emoji.

@@ -26,23 +26,22 @@ function sfSVG(size, filled = true) {
 }
 const SF = sfSVG(16), SF_BIG = sfSVG(22), SF_SM = sfSVG(13);
 
-// Seahorse trophy icon (inline SVG) — the Legacy prestige trophy. Built from
-// layered primitives: a double-stroked coiled body, a crowned head, snout,
-// dorsal fin and eye. Reads as a seahorse from 16px up.
-const SEAHORSE_BODY = 'M12 8.3 C9.8 10.1 10.2 12.9 12 14.3 C13.7 15.6 13 17.4 14.5 18.2 C16.6 19.3 16.5 21.5 14.2 21.9 C12.2 22.2 11.5 20.4 12.9 19.7 C13.8 19.3 13.5 18.3 12.5 18.6';
+// Seahorse trophy icon (inline SVG) — the Legacy prestige trophy. A filled
+// silhouette (trumpet snout, crowned spiky head, dorsal fin, coiled tail) in the
+// starfish's hand-drawn style. Reads as a seahorse from 16px up.
+const SEAHORSE_SIL = 'M4.6 7.9 C6.2 7.2 7.5 6.9 8.5 6.0 C9.0 4.9 9.2 4.1 9.9 3.6 L10.2 2.3 L10.9 3.5 L11.6 2.1 L12.3 3.4 L13.1 2.6 L13.6 3.9 C14.5 4.4 14.8 5.3 14.4 6.1 L15.1 6.7 L14.5 7.5 C15.3 8.3 15.2 9.3 14.6 10.1 L15.1 10.7 L14.4 11.5 C14.7 12.5 14.5 13.5 13.8 14.3 L14.3 15.0 L13.3 15.7 C12.9 16.7 12.9 17.7 13.4 18.5 C14.2 19.7 13.8 21.2 12.2 21.5 C10.7 21.8 9.5 20.7 9.7 19.2 C9.8 18.0 10.8 17.3 12.0 17.5 C12.9 17.6 13.2 18.5 12.7 19.2 C12.4 19.7 11.6 19.8 11.2 19.3 C10.7 18.7 10.9 17.5 10.6 16.4 C10.2 15.0 9.4 13.8 9.2 12.3 C9.0 10.9 9.7 9.9 9.0 8.7 C8.7 8.2 8.2 8.0 7.8 8.1 C6.7 8.3 5.6 8.4 5.0 8.6 C4.5 8.7 4.3 8.3 4.6 7.9 Z';
+const SEAHORSE_FIN = 'M14.6 9.6 C16.2 9.2 17.2 10.4 17.0 11.8 C16.9 12.9 15.9 13.6 14.7 13.4 C14.9 12.1 14.8 10.8 14.6 9.6 Z';
 function shSVG(size, filled = true) {
   const fill = filled ? '#3fb6c4' : 'rgba(255,255,255,0.14)';
+  const finFill = filled ? '#37a4b1' : 'rgba(255,255,255,0.10)';
   const dark = filled ? '#1f7d8a' : 'rgba(255,255,255,0.3)';
-  const eye = filled ? '#0b2f36' : 'rgba(0,0,0,0.25)';
+  const eye = filled
+    ? '<circle cx="10.9" cy="5.6" r="1.15" fill="#0b2f36"/><circle cx="10.55" cy="5.25" r="0.35" fill="#bff0f6"/>'
+    : '<circle cx="10.9" cy="5.6" r="1.05" fill="rgba(0,0,0,0.25)"/>';
   return `<svg class="sh" viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align:middle;margin:0 1px">`
-    + `<path d="${SEAHORSE_BODY}" fill="none" stroke="${dark}" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>`
-    + `<path d="${SEAHORSE_BODY}" fill="none" stroke="${fill}" stroke-width="3.0" stroke-linecap="round" stroke-linejoin="round"/>`
-    + `<path d="M9.3 6.3 L4.2 7.2 L9.2 8.9 Z" fill="${fill}" stroke="${dark}" stroke-width="1" stroke-linejoin="round"/>`
-    + `<ellipse cx="12" cy="6" rx="3.2" ry="3.4" fill="${fill}" stroke="${dark}" stroke-width="1"/>`
-    + `<g fill="${fill}" stroke="${dark}" stroke-width="0.8" stroke-linejoin="round">`
-    + `<path d="M10.4 3.1 L11.2 1.5 L12.0 3.2 Z"/><path d="M12.0 2.9 L12.9 1.4 L13.6 3.1 Z"/><path d="M13.5 3.3 L14.6 2.1 L14.7 3.9 Z"/></g>`
-    + `<path d="M14.7 8.2 L16.8 9.2 L14.5 10.8 Z" fill="${fill}" stroke="${dark}" stroke-width="0.8" stroke-linejoin="round"/>`
-    + `<circle cx="10.9" cy="5.7" r="1.05" fill="${eye}"/></svg>`;
+    + `<path d="${SEAHORSE_FIN}" fill="${finFill}" stroke="${dark}" stroke-width="0.7" stroke-linejoin="round"/>`
+    + `<path d="${SEAHORSE_SIL}" fill="${fill}" stroke="${dark}" stroke-width="0.8" stroke-linejoin="round"/>`
+    + `${eye}</svg>`;
 }
 const SH = shSVG(16), SH_BIG = shSVG(22), SH_SM = shSVG(13);
 
