@@ -56,6 +56,10 @@ export class Input {
   _sharkMove(e) {
     const lane = this.render.laneAtClientX(e.clientX);
     if (lane >= 0) this.game.sharkLane = lane;
+    // Ambush Shark: also aim the row from the vertical tap position.
+    if (this.game.sim && this.game.sim.powers && this.game.sim.powers.ambush) {
+      this.game.sharkRowY = this.render.fieldYAtClientY(e.clientY);
+    }
   }
 
   _up(e) {

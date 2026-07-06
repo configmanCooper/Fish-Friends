@@ -1,10 +1,11 @@
 // ui.js — DOM screens + HUD, one state machine. Reads/writes via the game object.
 import { COLORS } from './config.js';
 import { POWERUPS, INV_CAP, LEVEL, DEEP, COOLDOWN_ENABLED,
-  LEGACY_UPGRADES, legacyMaxBuys, legacyValue, BOSS_LEVEL } from './config.js';
+  LEGACY_UPGRADES, legacyMaxBuys, legacyValue, BOSS_LEVEL,
+  SEAHORSE_POWERS, SEAHORSE_POWER_IDS } from './config.js';
 import { LEVELS } from './levels.js';
 
-const SCREENS = ['title', 'map', 'prelevel', 'game', 'results', 'shop', 'settings', 'codes', 'legacy', 'legacyintro'];
+const SCREENS = ['title', 'map', 'prelevel', 'game', 'results', 'shop', 'settings', 'codes', 'legacy', 'legacyintro', 'powers'];
 
 // Starfish icon (inline SVG) — the game's currency & level rating.
 // Chunky rounded 5-armed sea-star (fat quadratic-bezier arms) with bump spots.
@@ -32,11 +33,11 @@ const SF = sfSVG(16), SF_BIG = sfSVG(22), SF_SM = sfSVG(13);
 const SEAHORSE_SIL = 'M4.6 7.9 C6.2 7.2 7.5 6.9 8.5 6.0 C9.0 4.9 9.2 4.1 9.9 3.6 L10.2 2.3 L10.9 3.5 L11.6 2.1 L12.3 3.4 L13.1 2.6 L13.6 3.9 C14.5 4.4 14.8 5.3 14.4 6.1 L15.1 6.7 L14.5 7.5 C15.3 8.3 15.2 9.3 14.6 10.1 L15.1 10.7 L14.4 11.5 C14.7 12.5 14.5 13.5 13.8 14.3 L14.3 15.0 L13.3 15.7 C12.9 16.7 12.9 17.7 13.4 18.5 C14.2 19.7 13.8 21.2 12.2 21.5 C10.7 21.8 9.5 20.7 9.7 19.2 C9.8 18.0 10.8 17.3 12.0 17.5 C12.9 17.6 13.2 18.5 12.7 19.2 C12.4 19.7 11.6 19.8 11.2 19.3 C10.7 18.7 10.9 17.5 10.6 16.4 C10.2 15.0 9.4 13.8 9.2 12.3 C9.0 10.9 9.7 9.9 9.0 8.7 C8.7 8.2 8.2 8.0 7.8 8.1 C6.7 8.3 5.6 8.4 5.0 8.6 C4.5 8.7 4.3 8.3 4.6 7.9 Z';
 const SEAHORSE_FIN = 'M14.6 9.6 C16.2 9.2 17.2 10.4 17.0 11.8 C16.9 12.9 15.9 13.6 14.7 13.4 C14.9 12.1 14.8 10.8 14.6 9.6 Z';
 function shSVG(size, filled = true) {
-  const fill = filled ? '#3fb6c4' : 'rgba(255,255,255,0.14)';
-  const finFill = filled ? '#37a4b1' : 'rgba(255,255,255,0.10)';
-  const dark = filled ? '#1f7d8a' : 'rgba(255,255,255,0.3)';
+  const fill = filled ? '#c67a33' : 'rgba(255,255,255,0.14)';
+  const finFill = filled ? '#b96f2b' : 'rgba(255,255,255,0.10)';
+  const dark = filled ? '#8a531d' : 'rgba(255,255,255,0.3)';
   const eye = filled
-    ? '<circle cx="10.9" cy="5.6" r="1.15" fill="#0b2f36"/><circle cx="10.55" cy="5.25" r="0.35" fill="#bff0f6"/>'
+    ? '<circle cx="10.9" cy="5.6" r="1.15" fill="#2b1808"/><circle cx="10.55" cy="5.25" r="0.35" fill="#f6e2c4"/>'
     : '<circle cx="10.9" cy="5.6" r="1.05" fill="rgba(0,0,0,0.25)"/>';
   return `<svg class="sh" viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align:middle;margin:0 1px">`
     + `<path d="${SEAHORSE_FIN}" fill="${finFill}" stroke="${dark}" stroke-width="0.7" stroke-linejoin="round"/>`
@@ -177,15 +178,29 @@ export class UI {
 
       <div class="screen" id="s-legacy">
         <div class="card wide">
+          <div class="legacy-corner">
+            <div class="legacy-seahorse">${shSVG(64)}</div>
+            <div class="seahorse-count"><span id="legacy-seahorses">0</span> ${SH_SM}</div>
+            <button class="btn btn-small" data-action="powers" id="legacy-powers-btn">⚡ Powers</button>
+          </div>
           <div class="card-level">🐚 Legacy</div>
           <div class="legacy-top">
             <div class="chip star-chip big">${SF_BIG} <span id="legacy-starfish">0</span></div>
-            <div class="chip seahorse-chip" title="Seahorse Trophies">${SH_BIG} <span id="legacy-seahorses">0</span></div>
           </div>
           <div class="legacy-note" id="legacy-note"></div>
           <div class="legacy-grid" id="legacy-grid"></div>
           <button class="btn btn-danger" data-action="prestige-restart" id="legacy-restart">♻️ Restart Journey (+1 ${SH_SM})</button>
           <button class="btn btn-primary" data-action="back-map">Back</button>
+        </div>
+      </div>
+
+      <div class="screen" id="s-powers">
+        <div class="card wide">
+          <div class="legacy-corner"><div class="legacy-seahorse">${shSVG(56)}</div></div>
+          <div class="card-level">⚡ Seahorse Powers</div>
+          <div class="legacy-note" id="powers-note"></div>
+          <div class="powers-grid" id="powers-grid"></div>
+          <button class="btn btn-primary" data-action="legacy">Back</button>
         </div>
       </div>
 
@@ -229,6 +244,8 @@ export class UI {
       case 'deep': g.startDeep(); break;
       case 'legacy': g.openLegacy(); break;
       case 'legacy-intro-ok': g.dismissLegacyIntro(); break;
+      case 'powers': g.openPowers(); break;
+      case 'toggle-power': g.togglePower(el.dataset.power); break;
       case 'buy-legacy': g.buyLegacy(el.dataset.legacy); break;
       case 'prestige-restart': g.confirmPrestige(); break;
       case 'settings': g.openSettings(); break;
@@ -338,6 +355,34 @@ export class UI {
     }
     const restart = document.getElementById('legacy-restart');
     if (restart) restart.disabled = locked;
+    // Powers button visible only if you own at least one seahorse.
+    const powBtn = document.getElementById('legacy-powers-btn');
+    if (powBtn) powBtn.style.display = (godMode || (saveData.seahorses || 0) > 0) ? '' : 'none';
+  }
+
+  // ---- Seahorse Powers ---------------------------------------------------
+  renderPowers(saveData, activePowers) {
+    const godMode = this.game && this.game.godMode;
+    const cap = godMode ? SEAHORSE_POWER_IDS.length : (saveData.seahorses || 0);
+    const enabled = new Set(activePowers || []);
+    const note = document.getElementById('powers-note');
+    if (note) note.innerHTML = `Choose up to <strong>${cap}</strong> power${cap === 1 ? '' : 's'} `
+      + `(one per Seahorse Trophy ${SH_SM}). Change them any time — trophies aren't spent. `
+      + `<strong>${enabled.size}/${cap}</strong> active.`;
+    const grid = document.getElementById('powers-grid');
+    grid.innerHTML = '';
+    for (const id of SEAHORSE_POWER_IDS) {
+      const pw = SEAHORSE_POWERS[id];
+      const on = enabled.has(id);
+      const full = !on && enabled.size >= cap;
+      const row = document.createElement('div');
+      row.className = 'power-item' + (on ? ' on' : '') + (full ? ' full' : '');
+      row.innerHTML =
+        `<div class="pw-icon">${pw.icon}</div>` +
+        `<div class="pw-body"><div class="pw-name">${pw.name}</div><div class="pw-desc">${pw.desc}</div></div>` +
+        `<button class="btn btn-small pw-toggle" data-action="toggle-power" data-power="${id}" ${full ? 'disabled' : ''}>${on ? 'ON' : (full ? '—' : 'OFF')}</button>`;
+      grid.appendChild(row);
+    }
   }
 
   // Show/hide the title's The Deep button based on unlock state.

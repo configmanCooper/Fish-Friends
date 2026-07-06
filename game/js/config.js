@@ -265,6 +265,25 @@ export function legacyValue(id, buys) {
 }
 
 // ---------------------------------------------------------------------------
+// Seahorse Powers. Each Seahorse Trophy lets you keep ONE power active (you can
+// enable up to `seahorses` of the five, and swap them any time — they aren't
+// consumed). Applied at runtime; they only ever help the player.
+// ---------------------------------------------------------------------------
+export const SEAHORSE_POWERS = {
+  prism:     { id: 'prism',     name: 'Prism Dash',   icon: '💎',
+               desc: 'When your fish makes a friend, 50% chance it passes through and becomes a rainbow fish. Those rainbow fish never cost points if they reach the top.' },
+  ambush:    { id: 'ambush',    name: 'Ambush Shark', icon: '🦈',
+               desc: 'Place a shark out in the ocean instead of on the beach. It sweeps its row across to one side, then back the other way once.' },
+  voyager:   { id: 'voyager',   name: 'Reef Voyager', icon: '🧭',
+               desc: 'Your fish swim through coral reefs, turn rainbow when passing an anemone, and speed up 50% through currents.' },
+  schooling: { id: 'schooling', name: 'Schooling',    icon: '🐟',
+               desc: 'Friending a fish also brings along every other same-colour fish in its row as friends — extra points included.' },
+  transmute: { id: 'transmute', name: 'Transmuter',   icon: '✨',
+               desc: 'Tri fish become black, black become white, white become a plain colour. Plus: double points for friending black and white fish.' },
+};
+export const SEAHORSE_POWER_IDS = Object.keys(SEAHORSE_POWERS);
+
+// ---------------------------------------------------------------------------
 // Prestige difficulty ramp. Each restart adds one color pair and pulls the
 // mechanic-intro levels earlier by 5, capped so nothing lands before L5 and the
 // ramp stops growing after PRESTIGE_RAMP_CAP restarts.

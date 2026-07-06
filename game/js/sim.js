@@ -66,6 +66,14 @@ export class Sim {
     };
     this._freeSharkRolled = false;
 
+    // Seahorse Powers active this run (default: none). Only ever help the player.
+    const pw = opts.powers || [];
+    const has = (id) => Array.isArray(pw) ? pw.includes(id) : !!(pw && pw[id]);
+    this.powers = {
+      prism: has('prism'), ambush: has('ambush'), voyager: has('voyager'),
+      schooling: has('schooling'), transmute: has('transmute'),
+    };
+
     this.enemies = [];
     this.players = [];
     this.spawnCursor = 0;
@@ -163,6 +171,15 @@ export class Sim {
       f._shifted.add(a.id);
       this._repaint(f, pool);
     }
+    // Reef Voyager: your own fish turn rainbow when they pass the anemone.
+    if (this.powers.voyager) {
+      for (const p of this.players) {
+        if (!p.alive || p.color === 'rainbow') continue;
+        if (p.lane !== a.lane || Math.abs(p.y - a.rowY) > ANEMONE.band) continue;
+        p.color = 'rainbow'; p.noWaste = true;
+        this.emit('anemoneShift', { id: p.id, lane: p.lane, to: 'rainbow', player: true });
+      }
+    }
   }
   // Repaint an enemy fish to a new colour (different from its current one).
   _repaint(f, pool) {
@@ -252,6 +269,8 @@ export class Sim {
     // mark enemies no longer in the coral lane as free
     for (const e of this.enemies) if (e.lane !== c.lane) e.coralStopped = false;
     // player fish moving up hit the coral and swim away (no score, no penalty)
+    // — unless Reef Voyager lets them pass straight through.
+    if (this.powers.voyager) return;
     for (const p of this.players) {
       if (p.alive && p.lane === c.lane && p.y >= c.rowY - CORAL.stopMargin) {
         p.alive = false;
@@ -395,9 +414,26 @@ export class Sim {
       if (rowKind === 'tri') { f.kind = 'tri'; f.bands = bands.slice(); f.phase = 0; }
       else if (rowKind === 'white' || rowKind === 'black') { f.kind = rowKind; f.phase = 0; f.color = null; }
       else { f.kind = 'normal'; f.color = color; }
+      this._transmuteFish(f);
       this.enemies.push(f);
       this.emit('spawn', { id: f.id, lane, kind: f.kind });
     }
+  }
+
+  // Transmuter power: downgrade specials at spawn (tri->black, black->white,
+  // white->plain colour with a selectable counter).
+  _transmuteFish(f) {
+    if (!this.powers.transmute) return f;
+    if (f.kind === 'tri') { f.kind = 'black'; f.phase = 0; f.color = null; delete f.bands; }
+    else if (f.kind === 'black') { f.kind = 'white'; f.phase = 0; f.color = null; }
+    else if (f.kind === 'white') { f.kind = 'normal'; f.phase = undefined; f.color = this._counterableColor(); }
+    return f;
+  }
+  _counterableColor() {
+    const picker = this.level.picker, pool = this.level.pool;
+    const ok = pool.filter((c) => picker.includes(opposite(c)));
+    const src = ok.length ? ok : pool;
+    return src[this.rng.int(0, src.length - 1)];
   }
 
   // Boss collision: a player fish reaching the whale with its OPPOSITE colour (or
@@ -515,6 +551,18 @@ export class Sim {
     this.emit('powerup', { kind: 'shark', lanes });
   }
 
+  // Ambush Shark power: a shark placed out in the ocean at (lane,row). It sweeps
+  // to the right edge, then reverses and sweeps to the left edge, then leaves —
+  // eating enemy fish it passes in that row.
+  useAmbushShark(startLane, rowY) {
+    const x = Math.max(0, Math.min(this.lanes - 1, startLane));
+    this.sharks.push({
+      id: fid(), horizontal: true, rowY: rowY == null ? 0.5 : rowY,
+      x, dir: 1, phase: 0, born: this.time, lanes: [Math.round(x)],
+    });
+    this.emit('powerup', { kind: 'ambushShark', lane: Math.round(x), rowY });
+  }
+
   // interior lanes (all but leftmost & rightmost) for squid.
   isInteriorLane(lane) { return lane > 0 && lane < this.lanes - 1; }
 
@@ -574,6 +622,7 @@ export class Sim {
       else if (s.kind === 'white' || s.kind === 'black') { f.phase = 0; f.color = null; }
       else { f.color = s.color; }
       if (s.minion) f.minion = true; // boss-fight minion: threat only, 0 points
+      this._transmuteFish(f);
       this.enemies.push(f);
       this._resolvedCount++;
       this.emit('spawn', { id: f.id, lane: f.lane, kind: f.kind });
@@ -597,7 +646,16 @@ export class Sim {
   moveFish(dt) {
     for (const e of this.enemies) { if (e.alive && !e.boss) e.y -= this.enemySpeed(e) * dt; }
     const ps = this.playerSpeed();
-    for (const p of this.players) { if (p.alive) p.y += ps * dt; }
+    const boost = this.powers.voyager && this.currents.length ? 1.5 : 1;
+    for (const p of this.players) {
+      if (!p.alive) continue;
+      let s = ps;
+      // Reef Voyager: player fish speed up 50% while crossing a current band.
+      if (boost !== 1) {
+        for (const c of this.currents) { if (Math.abs(p.y - c.rowY) <= CURRENT.band) { s *= 1.5; break; } }
+      }
+      p.y += s * dt;
+    }
   }
 
   // Prevent enemy fish from piling up / overtaking within a lane. A faster fish
@@ -627,7 +685,25 @@ export class Sim {
   }
 
   updateSharks(dt) {
+    const HSPEED = 4.5; // ambush shark lane-units per second
     for (const sh of this.sharks) {
+      if (sh.horizontal) {
+        sh.x += sh.dir * HSPEED * dt;
+        if (sh.phase === 0 && sh.x >= this.lanes - 1) { sh.x = this.lanes - 1; sh.dir = -1; sh.phase = 1; }
+        else if (sh.phase === 1 && sh.x <= 0) { sh.x = 0; sh.phase = 2; sh.done = true; }
+        const lane = Math.round(sh.x);
+        sh.lanes = [lane];
+        for (const e of this.enemies) {
+          if (!e.alive || e.boss) continue;
+          if (e.lane !== lane) continue;
+          if (Math.abs(e.y - sh.rowY) > 0.12) continue;
+          const val = remainingValue(e);
+          this.addScore(e.minion ? 0 : val);
+          e.alive = false; this.kills++;
+          this.emit('sharkEat', { id: e.id, lane: e.lane, value: val });
+        }
+        continue;
+      }
       sh.y += SPEED.player * SPEED.sharkMult * dt; // half the speed of a player fish
       // Eat any enemy in shark lanes within the shark's (big) body band.
       for (const e of this.enemies) {
@@ -635,14 +711,14 @@ export class Sim {
         if (!sh.lanes.includes(e.lane)) continue;
         if (e.y <= sh.y + 0.14 && e.y >= sh.y - 0.16) {
           const val = remainingValue(e); // shark scores the fish's full remaining value
-          this.addScore(val);
+          this.addScore(e.minion ? 0 : val);
           e.alive = false;
           this.kills++;
           this.emit('sharkEat', { id: e.id, lane: e.lane, value: val });
         }
       }
     }
-    this.sharks = this.sharks.filter((sh) => sh.y < 1.25);
+    this.sharks = this.sharks.filter((sh) => sh.horizontal ? !sh.done : sh.y < 1.25);
   }
 
   squidPass() {
@@ -698,15 +774,45 @@ export class Sim {
     }
   }
 
+  // Consume a player fish after a hit — unless Prism Dash procs (50%), in which
+  // case it passes through as a rainbow fish that never costs points at the top.
+  _consumePlayer(p) {
+    if (this.powers.prism && this.rng.chance(0.5)) {
+      p.color = 'rainbow';
+      p.noWaste = true;
+      this.emit('prismPass', { lane: p.lane });
+    } else {
+      p.alive = false;
+    }
+  }
+
+  // Schooling: friend every other same-colour normal fish in the same row.
+  _schoolFriend(color, y, exceptLane) {
+    const band = 0.09;
+    for (const e of this.enemies) {
+      if (!e.alive || e.boss || e.minion) continue;
+      if (e.kind !== 'normal' || e.color !== color) continue;
+      if (e.lane === exceptLane || Math.abs(e.y - y) > band) continue;
+      e.alive = false;
+      this.addScore(POINTS.normal);
+      this.kills++;
+      this.emit('fishKilled', { id: e.id, lane: e.lane, color: e.color, playerColor: color });
+      this.emit('friendPair', { lane: e.lane, colorA: e.color, colorB: color, y: e.y });
+    }
+  }
+
   // A correct player hit lands on enemy f.
   resolveHit(p, f) {
-    p.alive = false; // player fish consumed
+    const dbl = this.powers.transmute ? 2 : 1; // double points for black/white friends
+    const school = (color, y, lane) => { if (this.powers.schooling && !f.minion) this._schoolFriend(color, y, lane); };
     if (f.kind === 'normal') {
       f.alive = false;
       this.addScore(f.minion ? 0 : POINTS.normal); // boss minions score 0
       this.kills++;
       this.emit('fishKilled', { id: f.id, lane: f.lane, color: f.color, playerColor: p.color });
       this.emit('friendPair', { lane: f.lane, colorA: f.color, colorB: p.color, y: f.y });
+      school(f.color, f.y, f.lane);
+      this._consumePlayer(p);
       return;
     }
     if (f.kind === 'white') {
@@ -717,11 +823,13 @@ export class Sim {
         this.emit('transform', { id: f.id, lane: f.lane, kind: 'white', to: f.color });
       } else {
         f.alive = false;
-        this.addScore(1);
+        this.addScore(dbl);
         this.kills++;
         this.emit('fishKilled', { id: f.id, lane: f.lane, color: f.color, playerColor: p.color });
         this.emit('friendPair', { lane: f.lane, colorA: f.color, colorB: p.color, y: f.y });
+        school(f.color, f.y, f.lane);
       }
+      this._consumePlayer(p);
       return;
     }
     if (f.kind === 'black') {
@@ -732,11 +840,13 @@ export class Sim {
         this.emit('transform', { id: f.id, lane: f.lane, kind: 'black', to: f.color });
       } else {
         f.alive = false;
-        this.addScore(1);
+        this.addScore(dbl);
         this.kills++;
         this.emit('fishKilled', { id: f.id, lane: f.lane, color: f.color, playerColor: p.color });
         this.emit('friendPair', { lane: f.lane, colorA: f.color, colorB: p.color, y: f.y });
+        school(f.color, f.y, f.lane);
       }
+      this._consumePlayer(p);
       return;
     }
     if (f.kind === 'tri') {
@@ -747,9 +857,11 @@ export class Sim {
         this.kills++;
         this.emit('fishKilled', { id: f.id, lane: f.lane, kind: 'tri', playerColor: p.color });
         this.emit('friendPair', { lane: f.lane, colorA: f.bands[2], colorB: p.color, y: f.y });
+        school(f.bands[2], f.y, f.lane);
       } else {
         this.emit('transform', { id: f.id, lane: f.lane, kind: 'tri', phase: f.phase });
       }
+      this._consumePlayer(p);
       return;
     }
   }
@@ -768,8 +880,8 @@ export class Sim {
         p.alive = false;
         this.emit('playerExit', { lane: p.lane });
         // Wasted fish: every 2 that escape the top without a hit cost 1 point.
-        // Not applied on the boss level (fish sail past the big cycling body).
-        if (this.level.kind !== 'boss') {
+        // Not on the boss level, and never for Prism Dash rainbow fish (noWaste).
+        if (this.level.kind !== 'boss' && !p.noWaste) {
           this.wastedFish++;
           if (this.wastedFish >= 2) {
             this.wastedFish -= 2;

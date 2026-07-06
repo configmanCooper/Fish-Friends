@@ -213,3 +213,20 @@ html, body {
 .li-congrats { font-size:1rem; margin-bottom:10px; color:#eaf6ff; }
 .li-explain { text-align:left; font-size:.86rem; line-height:1.5; opacity:.92; margin-bottom:14px; }
 .li-explain p { margin:0 0 8px; }
+
+/* ===== Seahorse Powers + Legacy corner (v1.25) ===== */
+.card.wide { position: relative; }
+.legacy-corner { position:absolute; top:10px; right:12px; display:flex; flex-direction:column; align-items:center; gap:4px; z-index:2; }
+.legacy-seahorse { filter: drop-shadow(0 2px 3px rgba(0,0,0,.4)); animation: shBob 2.6s ease-in-out infinite; }
+.seahorse-count { font-weight:800; font-size:.9rem; color:#f2c088; }
+#legacy-powers-btn { padding:3px 8px; }
+.powers-grid { display:flex; flex-direction:column; gap:8px; margin:10px 0 12px; }
+.power-item { display:flex; align-items:center; gap:10px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:8px 10px; text-align:left; }
+.power-item.on { border-color:#37d0a0; box-shadow:0 0 10px rgba(55,208,160,.35); background:rgba(55,208,160,.10); }
+.power-item.full { opacity:.55; }
+.pw-icon { font-size:1.7rem; width:2rem; text-align:center; }
+.pw-body { flex:1; min-width:0; }
+.pw-name { font-weight:700; font-size:.92rem; }
+.pw-desc { font-size:.76rem; opacity:.85; line-height:1.35; }
+.pw-toggle { min-width:44px; }
+.power-item.on .pw-toggle { background:#2aa87f; }

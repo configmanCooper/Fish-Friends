@@ -457,6 +457,13 @@ export class Render3D {
     const fy = (clientY - rect.top) / rect.height; // 0 top .. 1 bottom
     return fy > (1 - FIELD.drawStripTop);
   }
+  // Field-space y (0 bottom .. 1 top) for a screen clientY — used to aim the
+  // Ambush Shark at a row in the open ocean.
+  fieldYAtClientY(clientY) {
+    const rect = this.canvas.getBoundingClientRect();
+    const fy = (clientY - rect.top) / rect.height;
+    return Math.max(0.08, Math.min(0.95, 1 - fy));
+  }
 
   // ---- event handling ----------------------------------------------------
   handleEvents(events, sim) {
@@ -494,7 +501,9 @@ export class Render3D {
       } else if (e.type === 'anemoneShift') {
         const hex = e.to && COLORS[e.to] ? COLORS[e.to].hex : 0xa970ff;
         this.fx.spawn(this.worldX(e.lane), this.worldY(0.5), 0.6, hex, { count: 12, speed: 0.7, size: 6 });
-        this.floaters.spawn(this.worldX(e.lane), this.worldY(0.5), 1, '✦');
+        if (!e.player) this.floaters.spawn(this.worldX(e.lane), this.worldY(0.5), 1, '✦');
+      } else if (e.type === 'prismPass') {
+        this.fx.spawn(this.worldX(e.lane), this.worldY(0.4), 0.6, 0xffffff, { count: 8, speed: 0.6, size: 5 });
       } else if (e.type === 'bossHit') {
         const wy = this.whaleGroup && this.whaleGroup.visible ? this.whaleGroup.position.y : this.worldY(0.6);
         this.fx.spawn(this.worldX(e.lane), wy, 0.6, 0xffef9a, { count: 10, speed: 0.9 });
@@ -619,6 +628,15 @@ export class Render3D {
           mesh.renderOrder = 2;
           this.scene.add(mesh);
           this.sharkMeshes.set(sh.id, mesh);
+        }
+        if (sh.horizontal) {
+          // Ambush shark: aim along its row, nose in the travel direction.
+          const scale = (2.2 * laneW) / 1.5;
+          mesh.position.set(this.worldX(sh.x), this.worldY(sh.rowY), 1.2);
+          mesh.scale.setScalar(scale);
+          mesh.rotation.z = (sh.dir >= 0 ? -Math.PI / 2 : Math.PI / 2)
+            + Math.sin(this.time * 8) * 0.05;
+          continue;
         }
         // centre across its (usually 3) lanes; scale to span them.
         const mid = (sh.lanes[0] + sh.lanes[sh.lanes.length - 1]) / 2;

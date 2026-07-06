@@ -1,6 +1,6 @@
 // main.js — boot, Game controller, fixed-timestep loop. Wires all modules.
 import { TICK_DT, LEVEL, DEEP, POWERUPS, DEEP as DEEPCFG, TOTAL_LEVELS, BOSS_LEVEL,
-  LEGACY_UPGRADES, legacyValue, legacyMaxBuys } from './config.js';
+  LEGACY_UPGRADES, legacyValue, legacyMaxBuys, SEAHORSE_POWERS, SEAHORSE_POWER_IDS } from './config.js';
 import { LEVELS, compileLevel, compileDeepBase, deepChunk, levelDefsFor } from './levels.js';
 import { Sim } from './sim.js';
 import { Render3D } from './render3d.js';
@@ -190,13 +190,21 @@ class Game {
     Save.save(this.save);
   }
 
+  // Active Seahorse Powers this run: the first `seahorses` enabled powers.
+  activePowers() {
+    const list = Array.isArray(this.save.seahorsePowers) ? this.save.seahorsePowers : [];
+    const cap = this.godMode ? 99 : (this.save.seahorses || 0);
+    return list.filter((id) => SEAHORSE_POWERS[id]).slice(0, cap);
+  }
+
   // ---- level lifecycle ---------------------------------------------------
   beginLevel() {
     this.deep = false;
-    this.sim = new Sim(this.level, { legacy: this._legacyOpts() });
+    this.sim = new Sim(this.level, { legacy: this._legacyOpts(), powers: this.activePowers() });
     this.render.setLevel(this.level.lanes);
     this.selectedColor = this.level.picker[0];
     this.pendingShark = false;
+    this.sharkRowY = 0.5;
     this.itemsUsedThisLevel = new Set(); // each item once per level
     this.itemUseCount = 0;               // max 3 items per level
     this.acc = 0;
@@ -262,6 +270,30 @@ class Game {
     this.ui.show('legacy');
   }
 
+  // Open/close the Seahorse Powers chooser.
+  openPowers() {
+    if ((this.save.seahorses || 0) <= 0 && !this.godMode) return;
+    this.state = 'powers';
+    this.ui.renderPowers(this.save, this.activePowers());
+    this.ui.show('powers');
+  }
+
+  // Toggle a Seahorse Power on/off. You can enable up to `seahorses` of them.
+  togglePower(id) {
+    if (!SEAHORSE_POWERS[id]) return;
+    let list = Array.isArray(this.save.seahorsePowers) ? this.save.seahorsePowers.slice() : [];
+    const cap = this.godMode ? SEAHORSE_POWER_IDS.length : (this.save.seahorses || 0);
+    if (list.includes(id)) {
+      list = list.filter((x) => x !== id);
+    } else {
+      if (list.length >= cap) return; // at slot capacity
+      list.push(id);
+    }
+    this.save.seahorsePowers = list;
+    Save.save(this.save);
+    this.ui.renderPowers(this.save, this.activePowers());
+  }
+
   buyLegacy(id) {
     if (!this.save.bossDefeated) return;           // locked after a restart until re-beaten
     const u = LEGACY_UPGRADES[id];
@@ -310,7 +342,7 @@ class Game {
     const deepUnlocked = this.godMode || this.save.bossDefeated || this.save.furthestLevel > DEEPCFG.unlockLevel;
     if (!deepUnlocked) { this.ui.toast && this.ui.show('map'); return; }
     this.level = compileDeepBase();
-    this.sim = new Sim(this.level, { endless: true, legacy: this._legacyOpts() });
+    this.sim = new Sim(this.level, { endless: true, legacy: this._legacyOpts(), powers: this.activePowers() });
     this.render.setLevel(this.level.lanes);
     this.selectedColor = this.level.picker[0];
     this.deep = true;
@@ -394,7 +426,9 @@ class Game {
     this.pendingShark = false;
     this._markItemUsed('shark');
     this._consume('shark');
-    this.sim.useShark(this.sharkLane);
+    // Ambush Shark power: drop it into the ocean at the aimed row instead.
+    if (this.sim.powers.ambush) this.sim.useAmbushShark(this.sharkLane, this.sharkRowY);
+    else this.sim.useShark(this.sharkLane);
     Audio.sfx.shark();
   }
 

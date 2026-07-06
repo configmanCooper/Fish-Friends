@@ -2,6 +2,22 @@
 
 All notable changes to Fish Friends.
 
+## [1.25.0] — 2026-07-06
+- **Seahorse Powers!** The Legacy menu now shows a big seahorse (brownish‑orange)
+  in the corner with a **Powers** button. Each Seahorse Trophy lets you keep one
+  power active — enable up to that many of five, swap them any time, they're never
+  spent:
+  - **Prism Dash** — friending a fish has a 50% chance to pass through as a
+    rainbow fish (which never costs points at the top).
+  - **Ambush Shark** — place a shark out in the ocean; it sweeps its row to one
+    side then back the other way.
+  - **Reef Voyager** — your fish pass through reefs, turn rainbow through
+    anemones, and speed up 50% through currents.
+  - **Schooling** — friending a fish brings along every same‑colour fish in its
+    row (extra points included).
+  - **Transmuter** — tri→black, black→white, white→plain colour, and double points
+    for friending black & white fish.
+
 ## [1.24.2] — 2026-07-06
 - **Patrol Shark upgrade buffed:** now +5% free-shark chance per level per
   purchase, up to **50%** (was +2% up to 20%).
