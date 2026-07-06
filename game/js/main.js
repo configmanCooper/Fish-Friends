@@ -223,6 +223,7 @@ class Game {
       this.save.furthestLevel = Math.min(TOTAL_LEVELS, this.levelN + 1);
     }
     // Beating the L50 boss unlocks The Deep AND the Legacy menu.
+    const firstEverClear = res.boss && res.bossWon && !this.save.legacyIntroSeen;
     if (res.boss && res.bossWon) {
       this.save.bossDefeated = true;
       if (this.save.furthestLevel <= BOSS_LEVEL) this.save.furthestLevel = BOSS_LEVEL + 1;
@@ -232,10 +233,24 @@ class Game {
     Save.save(this.save);
     res.earned = earned;
     res.legacyUnlocked = !!this.save.bossDefeated;
-    this.state = 'results';
     if (res.stars >= 1) Audio.sfx.star();
+    // The very first boss victory shows a congratulations + Legacy explainer.
+    if (firstEverClear) {
+      this.state = 'legacyintro';
+      this.ui.renderLegacyIntro(this.save);
+      this.ui.show('legacyintro');
+      return;
+    }
+    this.state = 'results';
     this.ui.renderResults(res);
     this.ui.show('results');
+  }
+
+  // Dismiss the first-clear Legacy explainer -> straight into the Legacy menu.
+  dismissLegacyIntro() {
+    this.save.legacyIntroSeen = true;
+    Save.save(this.save);
+    this.openLegacy();
   }
 
   // ---- Legacy (prestige) -------------------------------------------------

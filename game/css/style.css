@@ -203,3 +203,13 @@ html, body {
 .li-pips { letter-spacing:1px; font-size:.7rem; color:#7fd0ff; margin-top:2px; }
 .li-buy { white-space:nowrap; }
 .li-buy:disabled { opacity:.45; }
+
+/* ===== Seahorse icon + Legacy intro (v1.23.2) ===== */
+.sh { filter: drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
+.seahorse-chip { display:inline-flex; align-items:center; gap:4px; font-weight:800; }
+.legacy-intro-card { text-align:center; }
+.li-trophy { margin: 2px auto 6px; animation: shBob 2.4s ease-in-out infinite; }
+@keyframes shBob { 0%,100%{ transform:translateY(0) rotate(-3deg);} 50%{ transform:translateY(-6px) rotate(3deg);} }
+.li-congrats { font-size:1rem; margin-bottom:10px; color:#eaf6ff; }
+.li-explain { text-align:left; font-size:.86rem; line-height:1.5; opacity:.92; margin-bottom:14px; }
+.li-explain p { margin:0 0 8px; }

@@ -2,6 +2,14 @@
 
 All notable changes to Fish Friends.
 
+## [1.24.0] — 2026-07-06
+- **Real seahorse trophy icon.** The Legacy menu's Seahorse Trophies now use a
+  hand-drawn SVG seahorse (matching the starfish style) instead of emoji.
+- **First-boss congratulations.** Beating the Prism Whale for the first time now
+  shows a celebration screen that explains the Legacy system before opening it.
+- **Whale phase 3 tuning:** the split halves change colour 3× slower than the
+  earlier phases, giving more time to line up both opposites.
+
 ## [1.23.1] — 2026-07-06
 - **Whale boss balance:** fight fish friends swim 10% slower and there are ~25%
   fewer of them (50% fewer tri fish). The whale now creeps a step closer every

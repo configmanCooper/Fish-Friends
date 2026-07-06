@@ -222,6 +222,7 @@ export const BOSS = {
   hitRadius: 0.11,              // contact half-height (big body)
   segCooldown: 0.55,            // seconds a lane is inert after a contact
   cyclePeriod: 6.0,             // colour-cycle period (seconds) — slow so shots land fresh
+  phase3CycleMult: 3,           // final phase changes each half's colour 3x slower
   phaseAt: { p2: 0.66, p3: 0.33 }, // hp-fraction thresholds for phases 2 & 3
   splitWithin: 5,               // final phase: hit BOTH halves' opposites within this
   advanceEvery: 10,             // advances one step per this many seconds without a hit

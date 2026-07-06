@@ -21,6 +21,7 @@ function defaults() {
     legacy: legacyDefaults(), // permanent upgrades (persist across restarts)
     seahorses: 0,          // trophies: +1 per legacy restart
     prestige: 0,           // number of legacy restarts done (drives difficulty ramp)
+    legacyIntroSeen: false, // has the first-boss-clear Legacy explainer been shown?
   };
 }
 

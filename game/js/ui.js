@@ -4,7 +4,7 @@ import { POWERUPS, INV_CAP, LEVEL, DEEP, COOLDOWN_ENABLED,
   LEGACY_UPGRADES, legacyMaxBuys, legacyValue, BOSS_LEVEL } from './config.js';
 import { LEVELS } from './levels.js';
 
-const SCREENS = ['title', 'map', 'prelevel', 'game', 'results', 'shop', 'settings', 'codes', 'legacy'];
+const SCREENS = ['title', 'map', 'prelevel', 'game', 'results', 'shop', 'settings', 'codes', 'legacy', 'legacyintro'];
 
 // Starfish icon (inline SVG) — the game's currency & level rating.
 // Chunky rounded 5-armed sea-star (fat quadratic-bezier arms) with bump spots.
@@ -25,6 +25,26 @@ function sfSVG(size, filled = true) {
   return `<svg class="sf" viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align:middle;margin:0 1px"><path d="${STARFISH_PATH}" fill="${fill}" stroke="${stroke}" stroke-width="1.1" stroke-linejoin="round"/>${dots}</svg>`;
 }
 const SF = sfSVG(16), SF_BIG = sfSVG(22), SF_SM = sfSVG(13);
+
+// Seahorse trophy icon (inline SVG) — the Legacy prestige trophy. Built from
+// layered primitives: a double-stroked coiled body, a crowned head, snout,
+// dorsal fin and eye. Reads as a seahorse from 16px up.
+const SEAHORSE_BODY = 'M12 8.3 C9.8 10.1 10.2 12.9 12 14.3 C13.7 15.6 13 17.4 14.5 18.2 C16.6 19.3 16.5 21.5 14.2 21.9 C12.2 22.2 11.5 20.4 12.9 19.7 C13.8 19.3 13.5 18.3 12.5 18.6';
+function shSVG(size, filled = true) {
+  const fill = filled ? '#3fb6c4' : 'rgba(255,255,255,0.14)';
+  const dark = filled ? '#1f7d8a' : 'rgba(255,255,255,0.3)';
+  const eye = filled ? '#0b2f36' : 'rgba(0,0,0,0.25)';
+  return `<svg class="sh" viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align:middle;margin:0 1px">`
+    + `<path d="${SEAHORSE_BODY}" fill="none" stroke="${dark}" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>`
+    + `<path d="${SEAHORSE_BODY}" fill="none" stroke="${fill}" stroke-width="3.0" stroke-linecap="round" stroke-linejoin="round"/>`
+    + `<path d="M9.3 6.3 L4.2 7.2 L9.2 8.9 Z" fill="${fill}" stroke="${dark}" stroke-width="1" stroke-linejoin="round"/>`
+    + `<ellipse cx="12" cy="6" rx="3.2" ry="3.4" fill="${fill}" stroke="${dark}" stroke-width="1"/>`
+    + `<g fill="${fill}" stroke="${dark}" stroke-width="0.8" stroke-linejoin="round">`
+    + `<path d="M10.4 3.1 L11.2 1.5 L12.0 3.2 Z"/><path d="M12.0 2.9 L12.9 1.4 L13.6 3.1 Z"/><path d="M13.5 3.3 L14.6 2.1 L14.7 3.9 Z"/></g>`
+    + `<path d="M14.7 8.2 L16.8 9.2 L14.5 10.8 Z" fill="${fill}" stroke="${dark}" stroke-width="0.8" stroke-linejoin="round"/>`
+    + `<circle cx="10.9" cy="5.7" r="1.05" fill="${eye}"/></svg>`;
+}
+const SH = shSVG(16), SH_BIG = shSVG(22), SH_SM = shSVG(13);
 
 export class UI {
   constructor(root, game) {
@@ -139,16 +159,33 @@ export class UI {
         </div>
       </div>
 
+      <div class="screen" id="s-legacyintro">
+        <div class="card wide legacy-intro-card">
+          <div class="li-trophy">${shSVG(72)}</div>
+          <div class="card-level">The Prism Whale is at peace!</div>
+          <div class="li-congrats">You've beaten the final boss and unlocked <strong>Legacy</strong>.</div>
+          <div class="li-explain">
+            <p>🐚 <strong>Legacy</strong> is where your journey lives on. Spend leftover
+               ${SF_SM} starfish on <strong>permanent upgrades</strong> — they stay with you forever.</p>
+            <p>♻️ When you're ready, <strong>restart your journey</strong> to keep every upgrade,
+               earn a <strong>Seahorse Trophy</strong> ${SH_SM}, and face tougher seas — one extra
+               colour and hazards arriving sooner each time.</p>
+            <p>Your upgrades lock until you defeat the whale again — then you can buy more.</p>
+          </div>
+          <button class="btn btn-primary" data-action="legacy-intro-ok">Open Legacy 🐚</button>
+        </div>
+      </div>
+
       <div class="screen" id="s-legacy">
         <div class="card wide">
           <div class="card-level">🐚 Legacy</div>
           <div class="legacy-top">
             <div class="chip star-chip big">${SF_BIG} <span id="legacy-starfish">0</span></div>
-            <div class="chip seahorse-chip" title="Seahorse Trophies">🌊🐴 <span id="legacy-seahorses">0</span></div>
+            <div class="chip seahorse-chip" title="Seahorse Trophies">${SH_BIG} <span id="legacy-seahorses">0</span></div>
           </div>
           <div class="legacy-note" id="legacy-note"></div>
           <div class="legacy-grid" id="legacy-grid"></div>
-          <button class="btn btn-danger" data-action="prestige-restart" id="legacy-restart">♻️ Restart Journey (+1 🐴)</button>
+          <button class="btn btn-danger" data-action="prestige-restart" id="legacy-restart">♻️ Restart Journey (+1 ${SH_SM})</button>
           <button class="btn btn-primary" data-action="back-map">Back</button>
         </div>
       </div>
@@ -192,6 +229,7 @@ export class UI {
       case 'title': g.goToTitle(); break;
       case 'deep': g.startDeep(); break;
       case 'legacy': g.openLegacy(); break;
+      case 'legacy-intro-ok': g.dismissLegacyIntro(); break;
       case 'buy-legacy': g.buyLegacy(el.dataset.legacy); break;
       case 'prestige-restart': g.confirmPrestige(); break;
       case 'settings': g.openSettings(); break;
@@ -267,6 +305,10 @@ export class UI {
   }
 
   // ---- Legacy menu -------------------------------------------------------
+  renderLegacyIntro(saveData) {
+    document.getElementById('s-legacyintro'); // static content; nothing dynamic needed
+  }
+
   renderLegacy(saveData) {
     const godMode = this.game && this.game.godMode;
     document.getElementById('legacy-starfish').innerHTML = godMode ? '∞' : saveData.starfish;

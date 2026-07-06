@@ -309,14 +309,15 @@ export class Sim {
     let phase = frac <= BOSS.phaseAt.p3 ? 3 : frac <= BOSS.phaseAt.p2 ? 2 : 1;
     if (phase !== b.phase) {
       b.phase = phase;
-      if (phase === 3) this._recolorBoss(true, pool);
+      if (phase === 3) { this._recolorBoss(true, pool); b.cycleT = 0; }
       this.emit('bossPhase', { phase });
     }
 
-    // Colour cycle.
+    // Colour cycle. The final (split) phase cycles each half 3x slower.
     b.cycleT += dt;
-    if (b.cycleT >= BOSS.cyclePeriod) {
-      b.cycleT -= BOSS.cyclePeriod;
+    const period = BOSS.cyclePeriod * (b.phase === 3 ? BOSS.phase3CycleMult : 1);
+    if (b.cycleT >= period) {
+      b.cycleT -= period;
       b.colorIdx = (b.colorIdx + 1) % pool.length;
       this._recolorBoss(b.phase === 3, pool);
       this.emit('bossCycle', {});
