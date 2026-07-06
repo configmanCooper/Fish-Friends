@@ -283,6 +283,7 @@ export function compileBossLevel(def) {
   return {
     n: def.n, kind: 'boss', bossHp: hp, lanes: def.lanes, pool, picker,
     spawns: [],               // fish are spawned procedurally by the Sim
+    speedMult: BOSS.fishSpeedMult, // whale-fight fish friends swim 10% slower
     maxScore, passTarget: Math.ceil(maxScore * LEVEL.passPct),
     twoStar: Math.ceil(maxScore * LEVEL.twoStarPct),
     threeStar: Math.ceil(maxScore * LEVEL.threeStarPct),

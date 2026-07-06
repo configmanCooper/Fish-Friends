@@ -2,6 +2,12 @@
 
 All notable changes to Fish Friends.
 
+## [1.23.1] — 2026-07-06
+- **Whale boss balance:** fight fish friends swim 10% slower and there are ~25%
+  fewer of them (50% fewer tri fish). The whale now creeps a step closer every
+  **10s** (was 5s) without an opposite-colour hit, and retreats on 3 opposite-colour
+  hits within **15s** (was 10s).
+
 ## [1.23.0] — 2026-07-06
 - **Prism Whale boss reworked.** The whale now lurks at the back as a single
   two-lane creature (new top-down model, facing the beach) and **creeps one step

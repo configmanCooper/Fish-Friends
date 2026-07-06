@@ -224,17 +224,18 @@ export const BOSS = {
   cyclePeriod: 6.0,             // colour-cycle period (seconds) — slow so shots land fresh
   phaseAt: { p2: 0.66, p3: 0.33 }, // hp-fraction thresholds for phases 2 & 3
   splitWithin: 5,               // final phase: hit BOTH halves' opposites within this
-  advanceEvery: 5,              // advances one step per this many seconds without a hit
+  advanceEvery: 10,             // advances one step per this many seconds without a hit
   lateralEvery: 10,             // strafes one lane left/right every this many seconds
   retreatHits: 3,               // hits needed…
-  retreatWindow: 10,            // …within this many seconds to shove it back a step
+  retreatWindow: 15,            // …within this many seconds to shove it back a step
   maxLeaks: 20,                 // this many fish past you = you lose
+  fishSpeedMult: 0.9,           // whale-fight fish friends swim 10% slower
   fish: {                       // descending fish while you fight the whale
-    every: 2.4,                 // seconds between fish rows
+    every: 3.2,                 // seconds between fish rows (~25% fewer than 2.4)
     rowMin: 1, rowMax: 3,
     whiteChance: 0.10,
     blackChance: 0.10,
-    triChance: 0.08,
+    triChance: 0.04,            // 50% fewer tri fish
   },
 };
 

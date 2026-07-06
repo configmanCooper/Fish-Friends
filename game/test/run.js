@@ -470,7 +470,8 @@ function testBossLevel() {
 
   const nul = runBot(new Sim(compileLevel(def)), nullBot);
   eq(nul.stars, 0, 'boss NULL bot fails');
-  ok(nul.events.some((e) => e.type === 'levelEnd' && e.loseReason === 'beach'), 'whale reaches the beach against a do-nothing bot');
+  ok(nul.events.some((e) => e.type === 'levelEnd' && (e.loseReason === 'beach' || e.loseReason === 'swarm')),
+    'do-nothing bot loses the boss (beach or swarm)');
 
   const wrong = runBot(new Sim(compileLevel(def)), greedyWrongBot);
   eq(wrong.stars, 0, 'boss GREEDY-WRONG bot fails');
