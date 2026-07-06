@@ -1,6 +1,6 @@
 // run.js — Fish Friends headless test suite. Plain asserts, no deps.
 import {
-  COLORS, opposite, isCounter, cooldownFor, LEVEL, POINTS, SPECIAL,
+  COLORS, opposite, isCounter, cooldownFor, LEVEL, POINTS, SPECIAL, bossTypeFor,
 } from '../js/config.js';
 import { LEVELS, compileLevel, rowLaunchTime, launchesOf, levelDefsFor } from '../js/levels.js';
 import { Sim, remainingValue, requiredPlayerColor, playerActsOn } from '../js/sim.js';
@@ -486,6 +486,30 @@ function testBossLevel() {
   eq(p5null.stars, 0, 'prestige-5 boss NULL bot still fails');
 }
 
+// Sea Turtle boss (prestige 1's L50). Perfect wins by clearing splotches, hitting
+// the painted head, then surviving phase 3; null/wrong-colour bots lose to swarm.
+function testTurtleBoss() {
+  const def = levelDefsFor(1).find((d) => d.n === 50);
+  ok(def && def.kind === 'boss' && def.bossType === 'turtle', 'prestige-1 L50 is the Sea Turtle');
+  eq(bossTypeFor(0), 'whale', 'prestige 0 -> whale');
+  eq(bossTypeFor(1), 'turtle', 'prestige 1 -> turtle');
+  eq(bossTypeFor(2), 'whale', 'prestige 2 -> whale again');
+
+  const perfect = runBot(new Sim(compileLevel(def)), perfectBot);
+  ok(perfect.stars >= 3, `turtle PERFECT bot wins (leaks ${perfect.leaks})`);
+  ok(perfect.events.some((e) => e.type === 'turtleDefeated'), 'turtle swims away for the perfect bot');
+  ok(perfect.events.filter((e) => e.type === 'turtleHeadHit').length === 5, 'turtle takes 5 head hits (3+2) before phase 3');
+  ok(perfect.events.some((e) => e.type === 'turtlePhase3'), 'turtle reaches phase 3');
+
+  const nul = runBot(new Sim(compileLevel(def)), nullBot);
+  eq(nul.stars, 0, 'turtle NULL bot fails');
+  ok(nul.events.some((e) => e.type === 'levelEnd' && e.loseReason === 'swarm'), 'do-nothing loses the turtle to the swarm');
+
+  const wrong = runBot(new Sim(compileLevel(def)), greedyWrongBot);
+  eq(wrong.stars, 0, 'turtle GREEDY-WRONG bot fails');
+  ok(wrong.events.every((e) => e.type !== 'turtleDefeated'), 'wrong-colour bot never beats the turtle');
+}
+
 function testAnemoneShift() {
   const def = LEVELS.find((d) => d.n === 46);
   const lvl = compileLevel(def);
@@ -549,6 +573,7 @@ function main() {
   testNoEndUntilClear();
   testNoSpawnAfterTimer();
   testBossLevel();
+  testTurtleBoss();
   testAnemoneShift();
   testPrestigeRun();
 

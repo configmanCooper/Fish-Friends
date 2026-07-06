@@ -305,17 +305,25 @@ export class UI {
     if (legBtn) legBtn.style.display = legacyVisible ? '' : 'none';
   }
 
-  // Boss HP bar (shown only during the boss level). Pass the Sim (or null).
+  // Boss HP bar (shown only during a boss level). Pass the Sim (or null).
   updateBossHud(sim) {
     const hud = document.getElementById('boss-hud');
     if (!hud) return;
     const boss = sim && sim.boss;
-    if (!boss) { hud.style.display = 'none'; return; }
+    const turtle = sim && sim.turtle;
+    if (!boss && !turtle) { hud.style.display = 'none'; return; }
     hud.style.display = '';
-    const frac = boss.maxHp > 0 ? Math.max(0, boss.hp / boss.maxHp) : 0;
     const fill = document.getElementById('boss-hpfill');
-    if (fill) fill.style.width = (frac * 100).toFixed(1) + '%';
     const name = document.getElementById('boss-name');
+    if (turtle) {
+      const frac = turtle.maxHp > 0 ? Math.max(0, turtle.hp / turtle.maxHp) : 0;
+      if (fill) fill.style.width = (frac * 100).toFixed(1) + '%';
+      const left = Math.max(0, (turtle.maxLeaks || 30) - (sim.leaks || 0));
+      if (name) name.textContent = `🐢 Ancient Sea Turtle — Phase ${turtle.phase}  ·  🐟 ${left} left`;
+      return;
+    }
+    const frac = boss.maxHp > 0 ? Math.max(0, boss.hp / boss.maxHp) : 0;
+    if (fill) fill.style.width = (frac * 100).toFixed(1) + '%';
     const leaks = sim.leaks || 0, maxLeaks = 20;
     if (name) name.textContent = `🐋 Prism Whale — Phase ${boss.phase}  ·  🐟 ${Math.max(0, maxLeaks - leaks)} left`;
   }
@@ -412,6 +420,9 @@ export class UI {
   // feature present), so later levels stop harping on tri fish and L50 is the boss.
   _levelHint(n, level) {
     if (level.kind === 'boss') {
+      if (level.bossType === 'turtle') {
+        return '🐢 BOSS — the Ancient Sea Turtle! Clear the colour splotches on its shell with their OPPOSITES to make it poke its painted head out, then hit the head with its opposite. Survive its final spin — lose if 30 fish reach the beach.';
+      }
       return '🐋 BOSS — the Prism Whale! Hit it with the OPPOSITE of its colour (or a rainbow) to drive it back. Keep fish from leaking: if it reaches the beach or 20 fish slip past, you lose.';
     }
     const kinds = new Set((level.spawns || []).map((s) => s.kind));
@@ -501,9 +512,11 @@ export class UI {
   // ---- Results -----------------------------------------------------------
   renderResults(res) {
     const isBoss = !!res.boss;
+    const turtle = res.bossType === 'turtle';
     document.getElementById('res-title').textContent = isBoss
-      ? (res.bossWon ? '🐋 The Prism Whale is at peace!'
-        : (res.loseReason === 'beach' ? 'The whale reached the beach…' : 'Too many fish slipped past…'))
+      ? (res.bossWon
+          ? (turtle ? '🐢 The Ancient Sea Turtle swims free!' : '🐋 The Prism Whale is at peace!')
+          : (res.loseReason === 'beach' ? 'The whale reached the beach…' : 'Too many fish slipped past…'))
       : (res.passed ? 'Level Complete!' : 'The current was strong…');
     const pct = res.maxScore ? Math.min(1, res.score / res.maxScore) : 0;
     document.getElementById('res-fill').style.width = Math.round(pct * 100) + '%';

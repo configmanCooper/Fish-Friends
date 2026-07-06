@@ -241,6 +241,42 @@ export const BOSS = {
 };
 
 // ---------------------------------------------------------------------------
+// Boss roster — the L50 boss alternates each Legacy restart (prestige).
+// prestige 0 -> Prism Whale, prestige 1 -> Sea Turtle, then repeat.
+// ---------------------------------------------------------------------------
+export const BOSS_ROSTER = ['whale', 'turtle'];
+export function bossTypeFor(prestige) {
+  return BOSS_ROSTER[((prestige || 0) % BOSS_ROSTER.length + BOSS_ROSTER.length) % BOSS_ROSTER.length];
+}
+
+// ---------------------------------------------------------------------------
+// Ancient Sea Turtle boss (L50, prestige 1). A huge turtle at the back whose
+// shell is dotted with colour splotches. Clear the splotches with their opposite
+// colours to make it poke its painted head out; hit the head with its opposite
+// to damage it. Phase 2 it advances and slowly spins an 18-spot shell. Phase 3
+// (25% hp) it spins fast, sheds paint, self-drains to 1% while you survive, then
+// swims away for the win. Lose if 30 fish reach the beach. No timer.
+// ---------------------------------------------------------------------------
+export const TURTLE = {
+  hp: 100,                    // base; +20 per prestige-pair
+  hpPerPrestige: 20,
+  maxLeaks: 30,               // this many fish past you = you lose
+  hitRadius: 0.09,            // contact half-height for spots/head
+  segCooldown: 0.5,           // seconds a spot/head is inert after a contact
+  headLane: null,             // centre lane (computed)
+  // Phase 1: head tucked; shell fills the back row with one splotch per lane.
+  p1: { headOut: 5, hits: 3, shellY: 0.86, headY: 0.8, damagePerHit: null },
+  // Phase 2: advances; head in middle; shell slowly spins an 18-spot ring.
+  p2: { headOut: 10, hits: 2, shellY: 0.7, headY: 0.6, spinPeriod: 15, spots: 18, frontArc: 6 },
+  // Phase 3 (<=25% hp): fast spin, self-drain, sheds paint, two currents.
+  p3: { atFrac: 0.25, drainPct: 0.01, drainEvery: 3, spinPeriod: 7,
+        fishMult: 1.1, speedMult: 1.1, paintMin: 2, paintMax: 3, paintSpeed: 0.5,
+        currentLoRow: 1, currentHiRow: 4, leaveSpeed: 0.4 },
+  fishSpeedMult: 0.9,         // fight fish 10% slower (like the whale)
+  fish: { every: 3.2, rowMin: 1, rowMax: 3, whiteChance: 0.10, blackChance: 0.10, triChance: 0.04 },
+};
+
+// ---------------------------------------------------------------------------
 // Legacy (prestige) upgrades. Each purchase applies `per` up to `cap`.
 // ---------------------------------------------------------------------------
 export const LEGACY_UPGRADES = {

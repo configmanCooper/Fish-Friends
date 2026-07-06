@@ -2,6 +2,16 @@
 
 All notable changes to Fish Friends.
 
+## [1.26.0] — 2026-07-06
+- **New boss: the Ancient Sea Turtle!** The L50 boss now alternates each Legacy
+  restart — Prism Whale on your first journey, Sea Turtle on your second, and so
+  on. The turtle fills the back with a splotched shell: clear each colour splotch
+  with its opposite to make it poke its painted head out, then hit the head with
+  its opposite (×3 in phase 1). Phase 2 it advances and slowly spins an 18‑spot
+  shell (×2 head hits). Phase 3 (25% hp) it spins fast, sheds colour‑changing
+  paint, spawns two currents and self‑drains to 1% while you survive — then swims
+  away for the win. Lose if 30 fish reach the beach. No timer.
+
 ## [1.25.1] — 2026-07-06
 - **Harder god-mode code:** the cheat is now **`f1shyfr1ends`** (type it anywhere,
   or enter it on the Codes screen) instead of the simple `fish`.

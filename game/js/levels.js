@@ -4,7 +4,7 @@
 // counters (feasible-by-construction: required launch-time <= apmGuardPct of gap).
 // Nothing here imports three.js or the DOM.
 
-import { COOLDOWN, LEVEL, POINTS, cooldownFor, opposite, CURRENT, CORAL, ANEMONE, BOSS,
+import { COOLDOWN, LEVEL, POINTS, cooldownFor, opposite, CURRENT, CORAL, ANEMONE, BOSS, TURTLE, bossTypeFor,
   SPECIAL_ROWS, SHUFFLE_PICKER_FROM, FISH_DENSITY, SPECIAL_INTRO,
   TOTAL_LEVELS, BOSS_LEVEL, colorIdsForPairs, MAX_PAIRS, prestigePairs, prestigeShift, shiftedIntro } from './config.js';
 import { makeRng } from './rng.js';
@@ -120,7 +120,12 @@ function buildLevelDefs(prestige = 0) {
     };
     if (isBoss) {
       def.kind = 'boss';
-      def.bossHp = BOSS.hp + BOSS.hpPerPrestige * Math.min(prestige, 6);
+      def.bossType = bossTypeFor(prestige);
+      if (def.bossType === 'turtle') {
+        def.bossHp = TURTLE.hp + TURTLE.hpPerPrestige * Math.min(Math.floor(prestige / 2), 4);
+      } else {
+        def.bossHp = BOSS.hp + BOSS.hpPerPrestige * Math.min(prestige, 6);
+      }
     }
     defs.push(def);
   }
@@ -273,24 +278,28 @@ export function compileLevel(def) {
 // ---------------------------------------------------------------------------
 export function compileBossLevel(def) {
   const rng = makeRng(def.seed);
+  const bossType = def.bossType || 'whale';
   const pool = poolFor(def.colorsInPlay); // full pairs (even) => opposite-closed
   let picker = pickerFor(pool);
-  // close under opposite so any whale colour's counter is always selectable
+  // close under opposite so any boss colour's counter is always selectable
   for (const c of picker.slice()) { const o = opposite(c); if (!picker.includes(o)) picker.push(o); }
   picker = rng.shuffle(picker.slice()); // late-game shuffled picker
   const hp = def.bossHp || BOSS.hp;
   const maxScore = hp;
+  const fishSpeedMult = bossType === 'turtle' ? TURTLE.fishSpeedMult : BOSS.fishSpeedMult;
+  // The turtle keeps its own hazards (2 currents in phase 3); it starts with one
+  // current + anemone + reef vs the fish, same as the whale fight.
   return {
-    n: def.n, kind: 'boss', bossHp: hp, lanes: def.lanes, pool, picker,
+    n: def.n, kind: 'boss', bossType, bossHp: hp, lanes: def.lanes, pool, picker,
     spawns: [],               // fish are spawned procedurally by the Sim
-    speedMult: BOSS.fishSpeedMult, // whale-fight fish friends swim 10% slower
+    speedMult: fishSpeedMult,  // boss-fight fish friends swim 10% slower
     maxScore, passTarget: Math.ceil(maxScore * LEVEL.passPct),
     twoStar: Math.ceil(maxScore * LEVEL.twoStarPct),
     threeStar: Math.ceil(maxScore * LEVEL.threeStarPct),
     seed: def.seed,
     duration: 100000,         // effectively no timer (hazards need a finite number)
     spawnWindow: 100000,
-    currents: 1, coral: true, anemone: true, // all hazards active vs the fish
+    currents: bossType === 'turtle' ? 0 : 1, coral: true, anemone: true,
   };
 }
 

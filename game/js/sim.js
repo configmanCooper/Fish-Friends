@@ -5,7 +5,7 @@
 import {
   FIELD, SPEED, COOLDOWN, LEVEL, POINTS, POWERUPS, INV_CAP,
   cooldownFor, opposite, isCounter, COLORS,
-  ROW_YS, CURRENT, CORAL, ANEMONE, BOSS,
+  ROW_YS, CURRENT, CORAL, ANEMONE, BOSS, TURTLE,
 } from './config.js';
 import { makeRng } from './rng.js';
 
@@ -97,8 +97,10 @@ export class Sim {
 
     this._initHazards();
     this.boss = null;
+    this.turtle = null;
+    this.bossType = level.kind === 'boss' ? (level.bossType || 'whale') : null;
     this.bossWon = false;
-    if (level.kind === 'boss') this._initBoss();
+    if (level.kind === 'boss') { if (this.bossType === 'turtle') this._initTurtle(); else this._initBoss(); }
 
     this._resolvedCount = 0; // scripted spawns that have been spawned
   }
@@ -317,6 +319,7 @@ export class Sim {
   _bossY() { const b = this.boss; return BOSS.backY - (b.step / BOSS.steps) * (BOSS.backY - BOSS.beachY); }
 
   updateBoss(dt) {
+    if (this.bossType === 'turtle') return this.updateTurtle(dt);
     const b = this.boss;
     if (!b || this.bossWon) return;
     const pool = this.level.pool;
@@ -395,17 +398,18 @@ export class Sim {
     }
   }
 
-  _spawnBossFishRow() {
+  _spawnBossFishRow(cfg) {
+    cfg = cfg || BOSS.fish;
     const rng = this.rng;
-    const size = Math.min(this.lanes, rng.int(BOSS.fish.rowMin, BOSS.fish.rowMax));
+    const size = Math.min(this.lanes, rng.int(cfg.rowMin, cfg.rowMax));
     const start = rng.int(0, this.lanes - size);
     const pool = this.level.pool;
     // whole-row special sometimes
     let rowKind = null;
     const r = rng.next();
-    if (r < BOSS.fish.triChance) rowKind = 'tri';
-    else if (r < BOSS.fish.triChance + BOSS.fish.blackChance) rowKind = 'black';
-    else if (r < BOSS.fish.triChance + BOSS.fish.blackChance + BOSS.fish.whiteChance) rowKind = 'white';
+    if (r < cfg.triChance) rowKind = 'tri';
+    else if (r < cfg.triChance + cfg.blackChance) rowKind = 'black';
+    else if (r < cfg.triChance + cfg.blackChance + cfg.whiteChance) rowKind = 'white';
     const bands = rowKind === 'tri' ? rng.shuffle(pool.slice()).slice(0, 3) : null;
     const color = rng.pick(pool);
     for (let i = 0; i < size; i++) {
@@ -440,6 +444,7 @@ export class Sim {
   // rainbow) deals 1 damage and resets the advance timer; 3 hits within
   // retreatWindow shove it back a step. Wrong colours do nothing (no heal).
   bossCollide() {
+    if (this.bossType === 'turtle') return this.turtleCollide();
     const b = this.boss;
     if (!b || this.bossWon) return;
     const R = BOSS.hitRadius;
@@ -494,6 +499,259 @@ export class Sim {
       }
     }
   }
+
+  // ======================= Ancient Sea Turtle boss =======================
+  _turtleCenterLane() { return Math.floor(this.lanes / 2); }
+
+  _initTurtle() {
+    const hp = this.level.bossHp || TURTLE.hp;
+    this.turtle = {
+      hp, maxHp: hp, phase: 1,
+      headOut: false, headColor: null, headTimer: 0, headHitsLeft: TURTLE.p1.hits,
+      shellY: TURTLE.p1.shellY, headY: TURTLE.p1.headY,
+      spinAngle: 0, spinPeriod: 0,
+      spotsTotal: 0, spotsCleared: 0,      // phase 2 ring progress
+      refillT: 0,
+      drainT: 0, paintT: 0, paint: [],
+      leaving: false, leaveY: null,
+      fishT: TURTLE.fish.every, fishMult: 1, speedBoost: 1,
+      p3CurrentsAdded: false,
+    };
+    this.spots = [];     // active hittable splotch enemies (boss-flagged)
+    this._turtleSpawnP1Spots();
+    this.emit('turtleSpawn', { hp });
+  }
+
+  // Create a boss-flagged, hittable splotch enemy.
+  _makeSpot(lane, y, color) {
+    const s = { id: fid(), boss: true, turtleSpot: true, kind: 'boss', lane, y, color, alive: true, vulnerableAt: 0 };
+    this.enemies.push(s); this.spots.push(s);
+    return s;
+  }
+  _clearSpots() {
+    for (const s of this.spots) s.alive = false;
+    this.spots = [];
+  }
+  // distinct colours for N spots (each a different colour where possible)
+  _spotColors(n) {
+    const pool = this.level.pool.slice();
+    const out = [];
+    let bag = [];
+    for (let i = 0; i < n; i++) {
+      if (bag.length === 0) bag = this.rng.shuffle(pool.slice());
+      out.push(bag.pop());
+    }
+    return out;
+  }
+
+  // Phase 1: one splotch per lane along the back row, each a different colour.
+  _turtleSpawnP1Spots() {
+    this._clearSpots();
+    const colors = this._spotColors(this.lanes);
+    for (let l = 0; l < this.lanes; l++) this._makeSpot(l, TURTLE.p1.shellY, colors[l]);
+  }
+
+  // Phase 2: show `frontArc` splotches across central lanes; they refill from a
+  // pool of 18 as the shell spins, until all 18 are cleared.
+  _turtleSpawnP2Front() {
+    this._clearSpots();
+    const arc = Math.min(TURTLE.p2.frontArc, this.lanes);
+    const start = Math.max(0, this._turtleCenterLane() - Math.floor(arc / 2));
+    const remaining = this.turtle.spotsTotal - this.turtle.spotsCleared;
+    const show = Math.min(arc, remaining);
+    const colors = this._spotColors(show);
+    for (let i = 0; i < show; i++) this._makeSpot(start + i, TURTLE.p2.shellY, colors[i]);
+  }
+
+  _turtleHeadOut(dur) {
+    const t = this.turtle;
+    t.headOut = true;
+    t.headTimer = dur;
+    t.headColor = this.rng.pick(this.level.pool);
+    // add a hittable head enemy at the centre lane
+    this._clearSpots();
+    this.turtleHead = { id: fid(), boss: true, turtleHead: true, kind: 'boss',
+      lane: this._turtleCenterLane(), y: t.headY, color: t.headColor, alive: true, vulnerableAt: 0 };
+    this.enemies.push(this.turtleHead);
+    this.emit('turtleHeadOut', { color: t.headColor, phase: t.phase });
+  }
+  _turtleHeadTuck() {
+    const t = this.turtle;
+    t.headOut = false; t.headColor = null;
+    if (this.turtleHead) { this.turtleHead.alive = false; this.turtleHead = null; }
+  }
+
+  _turtleDamage(chunk) {
+    const t = this.turtle;
+    t.hp = Math.max(0, t.hp - chunk);
+    this.score = t.maxHp - t.hp;
+    this.emit('turtleHit', { hp: t.hp, maxHp: t.maxHp, phase: t.phase });
+  }
+
+  updateTurtle(dt) {
+    const t = this.turtle;
+    if (!t) return;
+    const headDamage = 0.15 * t.maxHp; // 5 head hits: 100% -> 25%
+
+    // Fish keep streaming down the whole fight (phase-3 spawns a bit more/faster).
+    const fishEvery = TURTLE.fish.every / t.fishMult;
+    t.fishT -= dt;
+    if (t.fishT <= 0 && !t.leaving) { t.fishT += fishEvery; this._spawnBossFishRow(TURTLE.fish); }
+
+    if (t.phase === 1) {
+      if (t.headOut) {
+        t.headTimer -= dt;
+        if (t.headTimer <= 0) { this._turtleHeadTuck(); this._turtleSpawnP1Spots(); } // missed -> retry
+      } else if (this.spots.length === 0) {
+        // all splotches cleared -> poke head out
+        this._turtleHeadOut(TURTLE.p1.headOut);
+      }
+      return;
+    }
+
+    if (t.phase === 2) {
+      // slow spin visual + ring refill
+      t.spinPeriod = TURTLE.p2.spinPeriod;
+      t.spinAngle = (t.spinAngle + (dt / t.spinPeriod) * Math.PI * 2) % (Math.PI * 2);
+      if (t.headOut) {
+        t.headTimer -= dt;
+        if (t.headTimer <= 0) { this._turtleHeadTuck(); this.turtle.spotsCleared = 0; this._turtleSpawnP2Front(); }
+      } else if (this.spots.length === 0) {
+        // front arc all cleared; refill next batch after a short rotation beat
+        if (t.spotsCleared >= t.spotsTotal) {
+          this._turtleHeadOut(TURTLE.p2.headOut);
+        } else {
+          t.refillT -= dt;
+          if (t.refillT <= 0) { t.refillT = t.spinPeriod / TURTLE.p2.spots; this._turtleSpawnP2Front(); }
+        }
+      }
+      return;
+    }
+
+    // Phase 3: fast spin, self-drain to 1%, shed paint, two currents, then leave.
+    t.spinPeriod = TURTLE.p3.spinPeriod;
+    t.spinAngle = (t.spinAngle + (dt / t.spinPeriod) * Math.PI * 2) % (Math.PI * 2);
+    if (!t.p3CurrentsAdded) {
+      t.p3CurrentsAdded = true;
+      t.fishMult = TURTLE.p3.fishMult; t.speedBoost = TURTLE.p3.speedMult;
+      this.currents.push({ id: 'tcur-lo', rowY: ROW_YS[TURTLE.p3.currentLoRow], baseDir: this.rng.chance(0.5) ? 1 : -1 });
+      this.currents.push({ id: 'tcur-hi', rowY: ROW_YS[TURTLE.p3.currentHiRow], baseDir: this.rng.chance(0.5) ? 1 : -1 });
+      this.emit('turtlePhase3', {});
+    }
+
+    if (!t.leaving) {
+      // self-drain 1% every drainEvery seconds
+      t.drainT += dt;
+      if (t.drainT >= TURTLE.p3.drainEvery) {
+        t.drainT -= TURTLE.p3.drainEvery;
+        t.hp = Math.max(0.01 * t.maxHp, t.hp - TURTLE.p3.drainPct * t.maxHp);
+        this.score = t.maxHp - t.hp;
+        this.emit('turtleDrain', { hp: t.hp });
+      }
+      // shed paint splotches that recolour fish
+      t.paintT -= dt;
+      if (t.paintT <= 0) {
+        t.paintT += 1;
+        const n = this.rng.int(TURTLE.p3.paintMin, TURTLE.p3.paintMax);
+        for (let i = 0; i < n; i++) {
+          const ang = this.rng.next() * Math.PI * 2;
+          t.paint.push({ x: this._turtleCenterLane(), y: TURTLE.p2.shellY,
+            vx: Math.cos(ang) * TURTLE.p3.paintSpeed, vy: Math.sin(ang) * TURTLE.p3.paintSpeed,
+            color: this.rng.pick(this.level.pool), life: 4 });
+        }
+      }
+      this._turtlePaintTick(dt);
+      if (t.hp <= 0.01 * t.maxHp + 1e-6) {
+        t.leaving = true; t.leaveY = TURTLE.p2.shellY;
+        this._clearSpots(); this._turtleHeadTuck(); t.paint.length = 0;
+        this.emit('turtleLeaving', {});
+      }
+    } else {
+      // no new fish; swim up and off screen -> win when gone
+      t.leaveY += TURTLE.p3.leaveSpeed * dt;
+      if (t.leaveY > 1.3) {
+        this.bossWon = true;
+        this.emit('turtleDefeated', {});
+      }
+    }
+  }
+
+  // Move paint projectiles; recolour any fish they touch.
+  _turtlePaintTick(dt) {
+    const t = this.turtle;
+    const pool = this.level.pool;
+    const keep = [];
+    for (const pt of t.paint) {
+      pt.x += pt.vx * dt / 0.16; // vx is field/s; lanes ~ x — scale a bit
+      pt.y += pt.vy * dt;
+      pt.life -= dt;
+      let hit = false;
+      for (const e of this.enemies) {
+        if (!e.alive || e.boss || e.minion === false) continue;
+        if (Math.round(pt.x) !== e.lane) continue;
+        if (Math.abs(pt.y - e.y) > 0.05) continue;
+        if (e.kind === 'normal') { e.color = pt.color; this.emit('anemoneShift', { id: e.id, lane: e.lane, to: pt.color }); hit = true; break; }
+      }
+      if (!hit && pt.life > 0 && pt.x >= -1 && pt.x <= this.lanes && pt.y >= 0 && pt.y <= 1.1) keep.push(pt);
+    }
+    t.paint = keep;
+  }
+
+  // Player fish hitting splotches (clear) or the painted head (damage).
+  turtleCollide() {
+    const t = this.turtle;
+    if (!t || this.bossWon) return;
+    const R = TURTLE.hitRadius;
+    const headDamage = 0.15 * t.maxHp;
+    for (const seg of this.enemies) {
+      if (!seg.boss || !seg.alive) continue;
+      if (this.time < seg.vulnerableAt) continue;
+      let p = null, best = Infinity;
+      for (const q of this.players) {
+        if (!q.alive || q.lane !== seg.lane) continue;
+        if (!playerActsOn(q.color, seg)) continue;
+        const d = Math.abs(q.y - seg.y);
+        if (d < R && d < best) { best = d; p = q; }
+      }
+      if (!p) continue;
+      p.alive = false;
+      seg.vulnerableAt = this.time + TURTLE.segCooldown;
+      if (seg.turtleSpot) {
+        seg.alive = false;
+        this.spots = this.spots.filter((s) => s !== seg);
+        if (t.phase === 2) t.spotsCleared++;
+        this.emit('turtleSpotClear', { lane: seg.lane, color: seg.color, phase: t.phase });
+      } else if (seg.turtleHead) {
+        this._turtleHeadTuck();
+        this._turtleDamage(headDamage);
+        t.headHitsLeft--;
+        this.emit('turtleHeadHit', { hp: t.hp, phase: t.phase });
+        if (t.phase === 1) {
+          if (t.headHitsLeft <= 0) {
+            // -> phase 2
+            t.phase = 2; t.headHitsLeft = TURTLE.p2.hits;
+            t.shellY = TURTLE.p2.shellY; t.headY = TURTLE.p2.headY;
+            t.spotsTotal = TURTLE.p2.spots; t.spotsCleared = 0; t.refillT = 0;
+            this.emit('turtlePhase', { phase: 2 });
+            this._turtleSpawnP2Front();
+          } else {
+            this._turtleSpawnP1Spots();
+          }
+        } else if (t.phase === 2) {
+          if (t.headHitsLeft <= 0) {
+            // -> phase 3 (force hp to the 25% gate if head hits overshot)
+            t.hp = Math.min(t.hp, TURTLE.p3.atFrac * t.maxHp);
+            this.score = t.maxHp - t.hp;
+            t.phase = 3; t.drainT = 0; t.paintT = 0;
+            this.emit('turtlePhase', { phase: 3 });
+          } else {
+            t.spotsCleared = 0; this._turtleSpawnP2Front();
+          }
+        }
+      }
+    }
+  }
+
   cooldownProgress() {
     if (this.lastCooldownLen <= 0) return 1;
     return Math.min(1, 1 - this.cooldownRemaining() / this.lastCooldownLen);
@@ -637,6 +895,8 @@ export class Sim {
     if (this.effects.ice.active) s *= SPEED.iceMult;
     // Legacy "Sluggish Tide": permanently slow enemy fish.
     if (this.legacy.friendSlow) s *= (1 - this.legacy.friendSlow);
+    // Sea Turtle phase 3 speeds the fish up a touch.
+    if (this.turtle && this.turtle.speedBoost !== 1) s *= this.turtle.speedBoost;
     return s;
   }
 
@@ -901,9 +1161,22 @@ export class Sim {
     if (this.endless) return; // Game controls endless termination (life-based)
     const dur = this.level.duration || LEVEL.duration;
     const timeUp = this.time >= dur;
-    // Boss level: WIN when the whale's HP hits 0; LOSE if it reaches the beach
-    // or 20 fish slip past you. No timer.
+    // Boss level: WIN/LOSE conditions differ per boss. No timer.
     if (this.level.kind === 'boss') {
+      if (this.bossType === 'turtle') {
+        const swarmed = this.leaks >= TURTLE.maxLeaks;
+        if (this.bossWon || swarmed) {
+          for (const s of this.enemies) if (s.boss) s.alive = false;
+          this.enemies = this.enemies.filter((e) => e.alive);
+          this.ended = true;
+          this.emit('levelEnd', {
+            score: this.score, maxScore: this.maxScore, stars: this.bossWon ? 3 : 0,
+            passTarget: this.level.passTarget, passed: this.bossWon,
+            boss: true, bossWon: this.bossWon, loseReason: this.bossWon ? null : 'swarm',
+          });
+        }
+        return;
+      }
       const b = this.boss;
       const beached = b && b.step >= BOSS.steps;
       const swarmed = this.leaks >= BOSS.maxLeaks;
@@ -956,6 +1229,16 @@ export class Sim {
         won: this.bossWon,
         colors: this.bossSegments().map((s) => s.color),
         leaks: this.leaks, maxLeaks: BOSS.maxLeaks,
+      } : null,
+      turtle: this.turtle ? {
+        hp: this.turtle.hp, maxHp: this.turtle.maxHp, phase: this.turtle.phase,
+        headOut: this.turtle.headOut, headColor: this.turtle.headColor,
+        headLane: this._turtleCenterLane(), headY: this.turtle.headY,
+        shellY: this.turtle.shellY, spinAngle: this.turtle.spinAngle,
+        leaving: this.turtle.leaving, leaveY: this.turtle.leaveY,
+        spots: this.spots ? this.spots.map((s) => ({ lane: s.lane, y: s.y, color: s.color })) : [],
+        paint: this.turtle.paint.map((p) => ({ x: p.x, y: p.y, color: p.color })),
+        leaks: this.leaks, maxLeaks: TURTLE.maxLeaks,
       } : null,
     };
   }

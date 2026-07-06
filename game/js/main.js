@@ -241,6 +241,7 @@ class Game {
     Save.save(this.save);
     res.earned = earned;
     res.legacyUnlocked = !!this.save.bossDefeated;
+    res.bossType = this.level.bossType || null;
     if (res.stars >= 1) Audio.sfx.star();
     // The very first boss victory shows a congratulations + Legacy explainer.
     if (firstEverClear) {
