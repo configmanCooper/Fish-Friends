@@ -1128,6 +1128,7 @@ export class Sim {
 
   handleLeaksAndExits() {
     for (const e of this.enemies) {
+      if (e.boss) continue; // boss spots/head/segments never leak
       if (e.alive && e.y <= FIELD.bottomLeakY) {
         e.alive = false;
         if (!e.minion) this.addScore(-1); // boss minions are threat-only, no score
