@@ -2,6 +2,12 @@
 
 All notable changes to Fish Friends.
 
+## [1.21.0] — 2026-07-06
+- **No more fish pile-ups:** enemy fish in the same lane no longer stack on or
+  overtake each other. When a faster fish (e.g. a normal fish behind a slower
+  white/tri fish) catches the one ahead, it holds a fixed gap and matches that
+  fish's speed instead of overlapping it. Fixes visual piling in later levels.
+
 ## [1.20.0] — 2026-07-05
 - **Microsoft Store ready:** upgraded the web manifest to store grade (id,
   categories, full 48→512 icon set + maskable icons, gameplay screenshots,

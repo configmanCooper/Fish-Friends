@@ -51,6 +51,7 @@ export const FIELD = {
   bottomLeakY: 0.0,     // enemy reaching here => leak (-1)
   topExitY: 1.05,       // player fish reaching here => harmless exit
   collideRadiusY: 0.045, // |yA - yB| < this (same lane) => meeting
+  enemyFollowGap: 0.06,  // min vertical gap between same-lane enemy fish (no piling/overtaking)
 };
 
 // ---------------------------------------------------------------------------

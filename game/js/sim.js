@@ -257,6 +257,7 @@ export class Sim {
     this.spawnDue();
     this.moveFish(dt);
     this.applyCurrents();
+    this.resolveEnemyStacking();
     this.updateCoral();
     this.applyCoral();
     this.updateSharks(dt);
@@ -296,6 +297,32 @@ export class Sim {
   moveFish(dt) {
     for (const e of this.enemies) { if (e.alive) e.y -= this.enemySpeed(e) * dt; }
     for (const p of this.players) { if (p.alive) p.y += SPEED.player * dt; }
+  }
+
+  // Prevent enemy fish from piling up / overtaking within a lane. A faster fish
+  // (e.g. normal fish behind a slower white/tri fish) that catches the one ahead
+  // is clamped to a minimum gap behind it — so it effectively slows to the
+  // leading fish's speed instead of overlapping it.
+  resolveEnemyStacking() {
+    const gap = FIELD.enemyFollowGap;
+    const byLane = new Map();
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      let arr = byLane.get(e.lane);
+      if (!arr) { arr = []; byLane.set(e.lane, arr); }
+      arr.push(e);
+    }
+    for (const arr of byLane.values()) {
+      if (arr.length < 2) continue;
+      // Leader first: sort by y ascending (lowest y = furthest down the screen).
+      arr.sort((a, b) => a.y - b.y);
+      let floor = arr[0].y;
+      for (let i = 1; i < arr.length; i++) {
+        const minY = floor + gap;
+        if (arr[i].y < minY) arr[i].y = minY; // hold trailing fish behind the one ahead
+        floor = arr[i].y;
+      }
+    }
   }
 
   updateSharks(dt) {
