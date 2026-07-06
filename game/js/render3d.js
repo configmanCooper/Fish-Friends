@@ -253,7 +253,7 @@ export class Render3D {
     }
     // Spot discs pool (colored splotches on the shell).
     this.turtleSpotMeshes = [];
-    this.turtleSpotGeo = new THREE.CircleGeometry(0.16, 14);
+    this.turtleSpotGeo = new THREE.CircleGeometry(0.07, 16);
     // Head (hidden until it pokes out).
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 14), new THREE.MeshLambertMaterial({ color: 0x2a7d52 }));
     head.scale.set(0.5, 0.62, 0.45); head.visible = false;
@@ -285,8 +285,8 @@ export class Render3D {
     // spin (relative to shell size, so scale spots with the group)
     this.turtleShell.rotation.z = t.spinAngle || 0;
 
-    // spots
-    const spots = t.spots || [];
+    // spots (live hittable splotches are stored on sim.spots, not sim.turtle)
+    const spots = (sim.spots || []).filter((s) => s && s.alive !== false);
     while (this.turtleSpotMeshes.length < spots.length) {
       const m = new THREE.Mesh(this.turtleSpotGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }));
       m.renderOrder = 4; this.turtleGroup.add(m); this.turtleSpotMeshes.push(m);
@@ -304,13 +304,14 @@ export class Render3D {
       m.scale.setScalar(1 / 1); // already in group space
     }
 
-    // head
+    // head (the hittable head lives on sim.turtleHead when it's out)
     const head = this.turtleHeadMesh;
-    head.visible = !!t.headOut && !t.leaving;
+    const hEnemy = sim.turtleHead;
+    head.visible = !!t.headOut && !!hEnemy && !t.leaving;
     if (head.visible) {
-      head.material.color.setHex(COLORS[t.headColor] ? COLORS[t.headColor].hex : 0x2a7d52);
-      const lx = (this.worldX(t.headLane) - cx) / span;
-      const ly = (this.worldY(t.headY) - this.worldY(shellY)) / span;
+      head.material.color.setHex(COLORS[hEnemy.color] ? COLORS[hEnemy.color].hex : 0x2a7d52);
+      const lx = (this.worldX(hEnemy.lane) - cx) / span;
+      const ly = (this.worldY(hEnemy.y) - this.worldY(shellY)) / span;
       head.position.set(lx, ly, 0.6);
     }
     if (t.leaving) { head.visible = true; head.material.color.setHex(0x2a7d52); head.position.set(0, 0.6, 0.6); }

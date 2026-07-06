@@ -2,7 +2,7 @@
 import { COLORS } from './config.js';
 import { POWERUPS, INV_CAP, LEVEL, DEEP, COOLDOWN_ENABLED,
   LEGACY_UPGRADES, legacyMaxBuys, legacyValue, BOSS_LEVEL,
-  SEAHORSE_POWERS, SEAHORSE_POWER_IDS } from './config.js';
+  SEAHORSE_POWERS, SEAHORSE_POWER_IDS, bossTypeFor } from './config.js';
 import { LEVELS } from './levels.js';
 
 const SCREENS = ['title', 'map', 'prelevel', 'game', 'results', 'shop', 'settings', 'codes', 'legacy', 'legacyintro', 'powers'];
@@ -181,11 +181,11 @@ export class UI {
           <div class="legacy-corner">
             <div class="legacy-seahorse">${shSVG(64)}</div>
             <div class="seahorse-count"><span id="legacy-seahorses">0</span> ${SH_SM}</div>
-            <button class="btn btn-small" data-action="powers" id="legacy-powers-btn">⚡ Powers</button>
           </div>
           <div class="card-level">🐚 Legacy</div>
           <div class="legacy-top">
             <div class="chip star-chip big">${SF_BIG} <span id="legacy-starfish">0</span></div>
+            <button class="btn btn-small" data-action="powers" id="legacy-powers-btn">⚡ Powers</button>
           </div>
           <div class="legacy-note" id="legacy-note"></div>
           <div class="legacy-grid" id="legacy-grid"></div>
@@ -282,6 +282,8 @@ export class UI {
     document.getElementById('map-starfish').innerHTML = godMode ? '∞' : saveData.starfish;
     const grid = document.getElementById('level-grid');
     grid.innerHTML = '';
+    // The L50 boss icon reflects the current journey's boss (whale or turtle).
+    const bossIcon = bossTypeFor(saveData.prestige || 0) === 'turtle' ? '🐢' : '🐋';
     for (const def of LEVELS) {
       const n = def.n;
       const unlocked = godMode || n <= saveData.furthestLevel;
@@ -289,7 +291,7 @@ export class UI {
       const b = document.createElement('button');
       const isBoss = n === BOSS_LEVEL;
       b.className = 'level-bubble' + (unlocked ? '' : ' locked') + (n === saveData.furthestLevel ? ' current' : '') + (isBoss ? ' boss' : '');
-      b.innerHTML = `<span class="lvl-n">${isBoss ? '🐋' : n}</span><span class="lvl-stars">${starStr(stars)}</span>`;
+      b.innerHTML = `<span class="lvl-n">${isBoss ? bossIcon : n}</span><span class="lvl-stars">${starStr(stars)}</span>`;
       if (unlocked) { b.dataset.action = 'start-level'; b.dataset.level = n; }
       grid.appendChild(b);
     }

@@ -2,6 +2,17 @@
 
 All notable changes to Fish Friends.
 
+## [1.26.2] — 2026-07-06
+- **Fixed the Sea Turtle boss render.** The colour splotches never appeared on his
+  shell (the renderer read the spot list from the wrong place, so zero splotch
+  meshes were ever created) and the painted head drew at an invalid position.
+  Both are fixed — every phase now shows its splotches and head correctly, and the
+  splotch discs are sized to read as distinct spots on the shell. Verified all
+  three phases + head‑out + paint‑shed + leaving render in‑browser.
+- Legacy UI: moved the **⚡ Powers** button up into the top row so it no longer
+  overlaps the note text, and the L50 map bubble now shows a 🐢 on turtle‑boss
+  journeys (🐋 on whale journeys).
+
 ## [1.26.0] — 2026-07-06
 - **New boss: the Ancient Sea Turtle!** The L50 boss now alternates each Legacy
   restart — Prism Whale on your first journey, Sea Turtle on your second, and so
