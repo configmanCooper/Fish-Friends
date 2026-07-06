@@ -475,6 +475,14 @@ function testBossLevel() {
   const wrong = runBot(new Sim(compileLevel(def)), greedyWrongBot);
   eq(wrong.stars, 0, 'boss GREEDY-WRONG bot fails');
   ok(wrong.events.every((e) => e.type !== 'bossDefeated'), 'wrong-colour bot never defeats the whale');
+
+  // High-prestige whale (much higher HP) is still fully defeatable by a perfect
+  // player, and a do-nothing player still loses.
+  const p5 = levelDefsFor(5).find((d) => d.n === 50);
+  const p5perfect = runBot(new Sim(compileLevel(p5)), perfectBot);
+  ok(p5perfect.stars >= 3, `prestige-5 boss PERFECT bot still wins (hp ${p5.bossHp})`);
+  const p5null = runBot(new Sim(compileLevel(p5)), nullBot);
+  eq(p5null.stars, 0, 'prestige-5 boss NULL bot still fails');
 }
 
 function testAnemoneShift() {

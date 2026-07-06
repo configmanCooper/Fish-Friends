@@ -91,7 +91,14 @@ export function runBot(sim, bot, opts = {}) {
   const dt = TICK_DT;
   const events = [];
   let guard = 0;
-  while (!sim.ended && guard < 60 * 200) {
+  // The boss level has no timer and its HP scales with prestige, so scale the
+  // safety cap with boss HP (perfect-bot kill time grows with HP). Normal
+  // levels keep the 200s cap.
+  const seconds = sim.level && sim.level.kind === 'boss'
+    ? 200 + (sim.level.bossHp || 0) * 4
+    : 200;
+  const maxTicks = 60 * seconds;
+  while (!sim.ended && guard < maxTicks) {
     bot(sim);
     sim.tick(dt);
     for (const e of sim.drainEvents()) events.push(e);
