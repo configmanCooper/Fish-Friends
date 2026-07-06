@@ -226,41 +226,48 @@ export function buildSharkGeometry() {
 // 128x128 pattern atlas: 4 cells (0 blank, 1 stripes, 2 dots, 3 chevrons)
 // arranged in a 2x2 grid. Alpha channel encodes the marking mask.
 export function buildPatternAtlas() {
-  const S = 128, cell = 64;
+  // 4 columns x 2 rows of 64px cells (256x128). Cell index i -> (col=i%4,row=i/4).
+  //  0 blank | 1 stripes | 2 dots | 3 chevrons | 4 grid | 5 waves | 6 triangles
+  const cell = 64;
+  const S = 256, H = 128;
   const c = document.createElement('canvas');
-  c.width = S; c.height = S;
+  c.width = S; c.height = H;
   const ctx = c.getContext('2d');
-  ctx.clearRect(0, 0, S, S);
+  ctx.clearRect(0, 0, S, H);
   ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+  const cx = (i) => (i % 4) * cell;
+  const cy = (i) => Math.floor(i / 4) * cell;
 
-  // cell coords (col,row): 0=(0,0) blank, 1=(1,0) stripes, 2=(0,1) dots, 3=(1,1) chevrons
-  const cx = (i) => (i % 2) * cell;
-  const cy = (i) => Math.floor(i / 2) * cell;
-
-  // stripes (cell 1)
-  {
-    const ox = cx(1), oy = cy(1);
-    for (let x = 0; x < cell; x += 14) ctx.fillRect(ox + x, oy, 7, cell);
-  }
-  // dots (cell 2)
-  {
-    const ox = cx(2), oy = cy(2);
+  // stripes (1)
+  { const ox = cx(1), oy = cy(1); for (let x = 0; x < cell; x += 14) ctx.fillRect(ox + x, oy, 7, cell); }
+  // dots (2)
+  { const ox = cx(2), oy = cy(2);
     for (let y = 8; y < cell; y += 18) for (let x = 8; x < cell; x += 18) {
       ctx.beginPath(); ctx.arc(ox + x, oy + y, 5, 0, Math.PI * 2); ctx.fill();
-    }
-  }
-  // chevrons (cell 3)
-  {
-    const ox = cx(3), oy = cy(3);
-    ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 5;
+    } }
+  // chevrons (3)
+  { const ox = cx(3), oy = cy(3); ctx.lineWidth = 5;
     for (let y = -cell; y < cell; y += 16) {
+      ctx.beginPath(); ctx.moveTo(ox, oy + y); ctx.lineTo(ox + cell / 2, oy + y + cell / 2); ctx.lineTo(ox + cell, oy + y); ctx.stroke();
+    } }
+  // grid (4)
+  { const ox = cx(4), oy = cy(4); ctx.lineWidth = 5;
+    for (let x = 8; x <= cell; x += 16) { ctx.beginPath(); ctx.moveTo(ox + x, oy); ctx.lineTo(ox + x, oy + cell); ctx.stroke(); }
+    for (let y = 8; y <= cell; y += 16) { ctx.beginPath(); ctx.moveTo(ox, oy + y); ctx.lineTo(ox + cell, oy + y); ctx.stroke(); } }
+  // waves (5)
+  { const ox = cx(5), oy = cy(5); ctx.lineWidth = 5;
+    for (let y = 6; y < cell; y += 16) {
       ctx.beginPath();
-      ctx.moveTo(ox, oy + y);
-      ctx.lineTo(ox + cell / 2, oy + y + cell / 2);
-      ctx.lineTo(ox + cell, oy + y);
+      for (let x = 0; x <= cell; x += 4) ctx.lineTo(ox + x, oy + y + Math.sin(x / cell * Math.PI * 2) * 5);
       ctx.stroke();
-    }
-  }
+    } }
+  // triangles (6)
+  { const ox = cx(6), oy = cy(6);
+    for (let y = 4; y < cell; y += 18) for (let x = 4; x < cell; x += 18) {
+      ctx.beginPath(); ctx.moveTo(ox + x, oy + y + 10); ctx.lineTo(ox + x + 6, oy + y); ctx.lineTo(ox + x + 12, oy + y + 10); ctx.closePath(); ctx.fill();
+    } }
+
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.minFilter = THREE.LinearFilter;
@@ -268,8 +275,8 @@ export function buildPatternAtlas() {
   return tex;
 }
 
-// pattern id (0 blank,1 stripes,2 dots,3 chevrons) -> uv offset for the atlas cell
+// pattern id -> uv offset for the atlas cell (4 cols x 2 rows).
 export function patternUvOffset(id) {
-  const col = id % 2, row = Math.floor(id / 2);
-  return [col * 0.5, 1.0 - (row + 1) * 0.5];
+  const col = id % 4, row = Math.floor(id / 4);
+  return [col * 0.25, 1.0 - (row + 1) * 0.5];
 }

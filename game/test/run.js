@@ -2,7 +2,7 @@
 import {
   COLORS, opposite, isCounter, cooldownFor, LEVEL, POINTS, SPECIAL,
 } from '../js/config.js';
-import { LEVELS, compileLevel, rowLaunchTime, launchesOf } from '../js/levels.js';
+import { LEVELS, compileLevel, rowLaunchTime, launchesOf, levelDefsFor } from '../js/levels.js';
 import { Sim, remainingValue, requiredPlayerColor, playerActsOn } from '../js/sim.js';
 import { perfectBot, nullBot, greedyWrongBot, runBot } from './bots.js';
 
@@ -247,7 +247,7 @@ function testIceSlows() {
 // 6. Level validator: max score, targets, spawn window, static APM.
 // ---------------------------------------------------------------------------
 function testLevelValidator() {
-  eq(LEVELS.length, 40, 'exactly 40 authored levels');
+  eq(LEVELS.length, 50, 'exactly 50 authored levels');
   for (const def of LEVELS) {
     const lvl = compileLevel(def);
     ok(lvl.maxScore > 0, `L${def.n} maxScore > 0`);
@@ -446,6 +446,61 @@ function testNoSpawnAfterTimer() {
 }
 
 // ---------------------------------------------------------------------------
+// Boss level (Prism Whale) + anemone mechanic + prestige.
+// ---------------------------------------------------------------------------
+function testBossLevel() {
+  const def = LEVELS.find((d) => d.n === 50);
+  ok(def && def.kind === 'boss', 'L50 is a boss level');
+  const lvl = compileLevel(def);
+  eq(lvl.maxScore, def.bossHp, 'boss maxScore == boss HP');
+  ok(lvl.spawns.length > 0, 'boss level has threat minions');
+
+  const perfect = runBot(new Sim(compileLevel(def)), perfectBot);
+  ok(perfect.stars >= 3, `boss PERFECT bot 3★ (score ${perfect.score}/${perfect.maxScore})`);
+  const pw = perfect.events.filter((e) => e.type === 'bossDefeated').length;
+  ok(pw === 1, 'boss defeated by perfect bot');
+
+  const nul = runBot(new Sim(compileLevel(def)), nullBot);
+  eq(nul.stars, 0, 'boss NULL bot fails');
+  ok(nul.events.every((e) => e.type !== 'bossDefeated'), 'boss survives the do-nothing bot');
+
+  const wrong = runBot(new Sim(compileLevel(def)), greedyWrongBot);
+  eq(wrong.stars, 0, 'boss GREEDY-WRONG bot fails (heals the whale)');
+  ok(wrong.events.every((e) => e.type !== 'bossDefeated'), 'wrong-colour bot never defeats the boss');
+}
+
+function testAnemoneShift() {
+  const def = LEVELS.find((d) => d.n === 46);
+  const lvl = compileLevel(def);
+  ok(lvl.anemone, 'L46 has a color-shift anemone');
+  // Drive perfect bot; expect at least one repaint event over the run.
+  const r = runBot(new Sim(lvl), perfectBot);
+  ok(r.events.some((e) => e.type === 'anemoneShift'), 'anemone repaints enemy fish');
+  ok(r.stars >= 3, `L46 perfect bot still 3★ despite anemone (score ${r.score}/${r.maxScore})`);
+}
+
+function testPrestigeRun() {
+  for (const prestige of [1, 2]) {
+    const defs = levelDefsFor(prestige);
+    eq(defs.length, 50, `prestige ${prestige}: 50 levels`);
+    // more colours in play at L10 than the base game
+    const l10 = defs.find((d) => d.n === 10);
+    ok(l10.colorsInPlay > 6, `prestige ${prestige}: L10 has extra colours (${l10.colorsInPlay})`);
+    // mechanics arrive earlier
+    const base = LEVELS.find((d) => d.coral).n;
+    const pc = defs.find((d) => d.coral).n;
+    ok(pc < base, `prestige ${prestige}: coral arrives earlier (${pc} < ${base})`);
+    // a mechanic never triggers before L5
+    ok(defs.every((d) => d.n >= 5 || (!d.coral && !d.anemone && d.currents === 0)), 'no mechanic before L5');
+    // perfect bot still clears a sampling incl. the boss
+    for (const n of [10, 30, 46, 50]) {
+      const r = runBot(new Sim(compileLevel(defs.find((d) => d.n === n))), perfectBot);
+      ok(r.stars >= 3, `prestige ${prestige} L${n} PERFECT bot 3★ (${r.score}/${r.maxScore})`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 function main() {
   testColors();
   testCooldown();
@@ -476,6 +531,9 @@ function main() {
   testSpecialRowsAndPicker();
   testNoEndUntilClear();
   testNoSpawnAfterTimer();
+  testBossLevel();
+  testAnemoneShift();
+  testPrestigeRun();
 
   console.log(`\n${pass} passed, ${fail} failed`);
   if (fail) {

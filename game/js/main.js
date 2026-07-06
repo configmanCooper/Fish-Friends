@@ -1,6 +1,7 @@
 // main.js — boot, Game controller, fixed-timestep loop. Wires all modules.
-import { TICK_DT, LEVEL, DEEP, POWERUPS, DEEP as DEEPCFG } from './config.js';
-import { LEVELS, compileLevel, compileDeepBase, deepChunk } from './levels.js';
+import { TICK_DT, LEVEL, DEEP, POWERUPS, DEEP as DEEPCFG, TOTAL_LEVELS, BOSS_LEVEL,
+  LEGACY_UPGRADES, legacyValue, legacyMaxBuys } from './config.js';
+import { LEVELS, compileLevel, compileDeepBase, deepChunk, levelDefsFor } from './levels.js';
 import { Sim } from './sim.js';
 import { Render3D } from './render3d.js';
 import { Input } from './input.js';
@@ -13,6 +14,7 @@ import { Debug } from './debug.js';
 class Game {
   constructor() {
     this.save = Save.load();
+    this.campaign = levelDefsFor(this.save.prestige || 0); // prestige-adjusted level defs
     this.canvas = document.getElementById('game-canvas');
     this.render = new Render3D(this.canvas);
     this.ui = new UI(document.getElementById('ui-root'), this);
@@ -153,10 +155,21 @@ class Game {
 
   openPreLevel(n) {
     this.levelN = n;
-    this.level = compileLevel(LEVELS[n - 1]);
+    this.level = compileLevel(this.campaign[n - 1]);
     this.state = 'prelevel';
     this.ui.renderPreLevel(n, this.level);
     this.ui.show('prelevel');
+  }
+
+  // Legacy upgrade effect values (fractions) passed to the Sim.
+  _legacyOpts() {
+    const lg = this.save.legacy || {};
+    return {
+      fishSpeed: legacyValue('fishSpeed', lg.fishSpeed),
+      friendSlow: legacyValue('friendSlow', lg.friendSlow),
+      rainbowChance: legacyValue('rainbowChance', lg.rainbowChance),
+      freeShark: legacyValue('freeShark', lg.freeShark),
+    };
   }
 
   buyItem(kind) {
@@ -180,7 +193,7 @@ class Game {
   // ---- level lifecycle ---------------------------------------------------
   beginLevel() {
     this.deep = false;
-    this.sim = new Sim(this.level);
+    this.sim = new Sim(this.level, { legacy: this._legacyOpts() });
     this.render.setLevel(this.level.lanes);
     this.selectedColor = this.level.picker[0];
     this.pendingShark = false;
@@ -196,7 +209,7 @@ class Game {
   }
 
   nextLevel() {
-    const n = Math.min(40, this.levelN + 1);
+    const n = Math.min(TOTAL_LEVELS, this.levelN + 1);
     this.openPreLevel(n);
   }
   replayLevel() { this.openPreLevel(this.levelN); }
@@ -206,25 +219,83 @@ class Game {
     const prevBest = this.save.bestStars[this.levelN] || 0;
     let earned = 0;
     if (res.stars > prevBest) { earned = res.stars - prevBest; this.save.bestStars[this.levelN] = res.stars; }
-    if (res.passed && this.levelN >= this.save.furthestLevel && this.levelN < 40) {
-      this.save.furthestLevel = Math.min(40, this.levelN + 1);
+    if (res.passed && this.levelN >= this.save.furthestLevel && this.levelN < TOTAL_LEVELS) {
+      this.save.furthestLevel = Math.min(TOTAL_LEVELS, this.levelN + 1);
     }
-    if (res.passed && this.levelN === 40) this.save.furthestLevel = 41; // unlock deep
+    // Beating the L50 boss unlocks The Deep AND the Legacy menu.
+    if (res.boss && res.bossWon) {
+      this.save.bossDefeated = true;
+      if (this.save.furthestLevel <= BOSS_LEVEL) this.save.furthestLevel = BOSS_LEVEL + 1;
+      res.bossFirstClear = true;
+    }
     this.save.starfish += earned;
     Save.save(this.save);
     res.earned = earned;
+    res.legacyUnlocked = !!this.save.bossDefeated;
     this.state = 'results';
     if (res.stars >= 1) Audio.sfx.star();
     this.ui.renderResults(res);
     this.ui.show('results');
   }
 
+  // ---- Legacy (prestige) -------------------------------------------------
+  openLegacy() {
+    // Viewable even while locked (post-restart): renderLegacy shows the locked
+    // state and buyLegacy/confirmPrestige guard the actual actions.
+    this.state = 'legacy';
+    this.ui.renderLegacy(this.save);
+    this.ui.show('legacy');
+  }
+
+  buyLegacy(id) {
+    if (!this.save.bossDefeated) return;           // locked after a restart until re-beaten
+    const u = LEGACY_UPGRADES[id];
+    if (!u) return;
+    const cur = this.save.legacy[id] || 0;
+    if (cur >= legacyMaxBuys(id)) return;          // at cap
+    if (this.godMode) { this.save.legacy[id] = cur + 1; }
+    else {
+      if (this.save.starfish < u.cost) return;
+      this.save.starfish -= u.cost;
+      this.save.legacy[id] = cur + 1;
+    }
+    Audio.sfx.buy && Audio.sfx.buy();
+    Save.save(this.save);
+    this.ui.renderLegacy(this.save);
+  }
+
+  // Restart progress: keep permanent upgrades + seahorses, wipe run progress,
+  // grant a seahorse trophy, and raise the prestige difficulty.
+  confirmPrestige() {
+    if (!this.save.bossDefeated) return;
+    const yes = (typeof confirm === 'function')
+      ? confirm('Restart your journey? You keep all Legacy upgrades and earn a Seahorse Trophy, but your levels, starfish and items reset — and the seas grow harder. Upgrades lock until you beat the boss again.')
+      : true;
+    if (!yes) return;
+    this.doPrestige();
+  }
+
+  doPrestige() {
+    this.save.seahorses = (this.save.seahorses || 0) + 1;
+    this.save.prestige = (this.save.prestige || 0) + 1;
+    this.save.furthestLevel = 1;
+    this.save.bestStars = {};
+    this.save.starfish = 0;
+    this.save.inventory = { ice: 0, shark: 0, rainbow: 0, squid: 0 };
+    this.save.bossDefeated = false; // upgrades locked until the boss is beaten again
+    Save.save(this.save);
+    this.campaign = levelDefsFor(this.save.prestige);
+    Audio.sfx.star && Audio.sfx.star();
+    this.ui.renderLegacy(this.save);
+    this.goToMap();
+  }
+
   // ---- The Deep ----------------------------------------------------------
   startDeep() {
-    const deepUnlocked = this.godMode || this.save.furthestLevel > DEEPCFG.unlockLevel || this.save.bestStars[40];
+    const deepUnlocked = this.godMode || this.save.bossDefeated || this.save.furthestLevel > DEEPCFG.unlockLevel;
     if (!deepUnlocked) { this.ui.toast && this.ui.show('map'); return; }
     this.level = compileDeepBase();
-    this.sim = new Sim(this.level, { endless: true });
+    this.sim = new Sim(this.level, { endless: true, legacy: this._legacyOpts() });
     this.render.setLevel(this.level.lanes);
     this.selectedColor = this.level.picker[0];
     this.deep = true;
@@ -406,6 +477,7 @@ class Game {
         document.getElementById('hud-score').textContent = `❤ ${this.deepLife}`;
       } else {
         this.ui.updateHUD(this.sim.time, this.sim.score, this.level.passTarget, this.sim.cooldownProgress(), this.pendingShark, this.level.duration);
+        this.ui.updateBossHud(this.sim.boss || null);
       }
     }
     this.debug.frame(dt, this.render, inGame ? this.sim : null);

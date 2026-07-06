@@ -4,8 +4,17 @@
 // counters (feasible-by-construction: required launch-time <= apmGuardPct of gap).
 // Nothing here imports three.js or the DOM.
 
-import { COOLDOWN, LEVEL, POINTS, cooldownFor, opposite, CURRENT, CORAL, SPECIAL_ROWS, SHUFFLE_PICKER_FROM, FISH_DENSITY } from './config.js';
+import { COOLDOWN, LEVEL, POINTS, cooldownFor, opposite, CURRENT, CORAL, ANEMONE, BOSS,
+  SPECIAL_ROWS, SHUFFLE_PICKER_FROM, FISH_DENSITY, SPECIAL_INTRO,
+  TOTAL_LEVELS, BOSS_LEVEL, colorIdsForPairs, MAX_PAIRS, prestigePairs, prestigeShift, shiftedIntro } from './config.js';
 import { makeRng } from './rng.js';
+
+// Full ordered colour-id list (opposite pairs grouped); pools slice from here.
+const ORDERED_COLORS = colorIdsForPairs(MAX_PAIRS);
+function poolFor(count) {
+  const k = Math.max(1, Math.min(ORDERED_COLORS.length, count));
+  return ORDERED_COLORS.slice(0, k);
+}
 
 // Enemy color pools by "colors in play" count.
 const POOLS = {
@@ -55,46 +64,64 @@ function colorsFor(n) {
   if (n <= 5) return 3;
   if (n <= 7) return 4;
   if (n <= 9) return 5;
-  return 6; // L10+ uses all six colors
+  return 6; // L10+ uses all six base colors
 }
 function lanesFor(n) {
   if (n <= 11) return 5;
   if (n <= 24) return 6;
   return 7;
 }
-function specialsFor(n) {
+// Special-fish budgets. Intro levels shift earlier with prestige.
+function specialsFor(n, prestige = 0) {
   const s = {};
-  if (n >= 12) s.white = Math.min(3, 1 + Math.floor((n - 12) / 5)); // white from L12
-  if (n >= 14) s.black = Math.min(3, 1 + Math.floor((n - 14) / 5)); // black from L14
-  if (n >= 20) s.tri = Math.min(2, 1 + Math.floor((n - 20) / 8));   // tri-color from L20
+  const w = shiftedIntro(SPECIAL_INTRO.white, prestige);
+  const b = shiftedIntro(SPECIAL_INTRO.black, prestige);
+  const t = shiftedIntro(SPECIAL_INTRO.tri, prestige);
+  if (n >= w) s.white = Math.min(3, 1 + Math.floor((n - w) / 5));
+  if (n >= b) s.black = Math.min(3, 1 + Math.floor((n - b) / 5));
+  if (n >= t) s.tri = Math.min(2, 1 + Math.floor((n - t) / 8));
   return s;
 }
 function isIntroLevel(n) {
   // levels that introduce a new colour count or a new special fish -> taught in calm
-  return [1, 2, 4, 6, 8, 10, 12, 14, 20].includes(n);
+  return [1, 2, 4, 6, 8, 10, 12, 14, 20, 46].includes(n);
 }
 
-function buildLevelDefs() {
+function buildLevelDefs(prestige = 0) {
   const defs = [];
-  for (let n = 1; n <= 40; n++) {
-    const colors = colorsFor(n);
+  const pairs = prestigePairs(prestige);      // total colour pairs available
+  const maxColors = pairs * 2;
+  const curFrom = shiftedIntro(CURRENT.rowsFrom, prestige);
+  const curTwoFrom = shiftedIntro(CURRENT.twoFrom, prestige);
+  const coralFrom = shiftedIntro(CORAL.from, prestige);
+  const anemFrom = shiftedIntro(ANEMONE.from, prestige);
+  for (let n = 1; n <= TOTAL_LEVELS; n++) {
+    const isBoss = n === BOSS_LEVEL;
+    // Each prestige adds colours across every level, capped by available pairs.
+    const colors = Math.min(maxColors, colorsFor(n) + prestige * 2);
     const maxSize = n === 1 ? 1 : Math.max(3, Math.min(7, 3 + Math.floor((n - 2) / 7)));
     const def = {
       n,
       lanes: lanesFor(n),
-      colorsInPlay: colors,
+      colorsInPlay: isBoss ? maxColors : colors,
       // enemy ("friend") fish swim 10% faster before level 20
       speedMult: (0.85 + (n - 1) * 0.021) * (n < 20 ? 1.1 : 1),
       rowSizeMin: n === 1 ? 1 : 2,
       rowSizeMax: maxSize,
       minGap: Math.max(1.8, 3.0 - (n - 1) * 0.03),
       maxDistinct: Math.min(3, Math.max(1, colors - 1)),
-      specials: specialsFor(n),
+      specials: isBoss ? {} : specialsFor(n, prestige),
       newThing: isIntroLevel(n),
-      duration: n === 1 ? 45 : undefined, // Level 1 is a shorter 45s tutorial
-      currents: n >= CURRENT.twoFrom ? 2 : (n >= CURRENT.rowsFrom ? 1 : 0),
-      coral: n >= CORAL.from,
+      duration: isBoss ? BOSS.duration : (n === 1 ? 45 : undefined),
+      currents: isBoss ? 0 : (n >= curTwoFrom ? 2 : (n >= curFrom ? 1 : 0)),
+      coral: isBoss ? false : (n >= coralFrom),
+      anemone: isBoss ? false : (n >= anemFrom),
+      prestige,
     };
+    if (isBoss) {
+      def.kind = 'boss';
+      def.bossHp = BOSS.hp + BOSS.hpPerPrestige * Math.min(prestige, 6);
+    }
     defs.push(def);
   }
 
@@ -103,12 +130,14 @@ function buildLevelDefs() {
     d.lanes = Math.round(d.lanes * 1.5);
   }
 
-  // Assign a stable seed per level.
-  for (const d of defs) d.seed = 0x5F1E + d.n * 2654435761 >>> 0;
+  // Assign a stable seed per level (varies with prestige so runs differ).
+  for (const d of defs) d.seed = (0x5F1E + d.n * 2654435761 + prestige * 40503) >>> 0;
   return defs;
 }
 
-export const LEVELS = buildLevelDefs();
+// Base campaign (un-prestiged). Use levelDefsFor(prestige) for the live run.
+export const LEVELS = buildLevelDefs(0);
+export function levelDefsFor(prestige = 0) { return buildLevelDefs(prestige); }
 
 // ---------------------------------------------------------------------------
 // compileLevel(def) -> concrete, deterministic level.
@@ -118,8 +147,9 @@ export const LEVELS = buildLevelDefs();
 // level is always physically clearable.
 // ---------------------------------------------------------------------------
 export function compileLevel(def) {
+  if (def.kind === 'boss') return compileBossLevel(def);
   const rng = makeRng(def.seed);
-  const pool = POOLS[def.colorsInPlay];
+  const pool = poolFor(def.colorsInPlay);
   const picker = pickerFor(pool);
   const lanes = def.lanes;
   const spawns = [];
@@ -147,11 +177,12 @@ export function compileLevel(def) {
     ? Math.max(2, Math.floor(estRows / (totalSpecials + 1)))
     : Infinity;
 
-  // Whole-row special kinds unlocked at higher levels.
+  // Whole-row special kinds unlocked at higher levels (prestige pulls earlier).
+  const prestige = def.prestige || 0;
   const specialRowKinds = [];
-  if (def.n >= SPECIAL_ROWS.white) specialRowKinds.push('white');
-  if (def.n >= SPECIAL_ROWS.black) specialRowKinds.push('black');
-  if (def.n >= SPECIAL_ROWS.tri) specialRowKinds.push('tri');
+  if (def.n >= shiftedIntro(SPECIAL_ROWS.white, prestige)) specialRowKinds.push('white');
+  if (def.n >= shiftedIntro(SPECIAL_ROWS.black, prestige)) specialRowKinds.push('black');
+  if (def.n >= shiftedIntro(SPECIAL_ROWS.tri, prestige)) specialRowKinds.push('tri');
 
   while (t < spawnWindow) {
     // Occasionally spawn a whole row of one special kind (same tri pattern).
@@ -221,8 +252,8 @@ export function compileLevel(def) {
       if (!finalPicker.includes(o)) finalPicker.push(o);
     }
   }
-  // From L30, shuffle the picker so the colour buttons are in a random order.
-  if (def.n >= SHUFFLE_PICKER_FROM) {
+  // From L30 (earlier with prestige), shuffle the picker button order.
+  if (def.n >= shiftedIntro(SHUFFLE_PICKER_FROM, prestige)) {
     finalPicker = rng.shuffle(finalPicker === picker ? picker.slice() : finalPicker);
   }
 
@@ -231,7 +262,57 @@ export function compileLevel(def) {
   const twoStar = Math.ceil(maxScore * LEVEL.twoStarPct);
   const threeStar = Math.ceil(maxScore * LEVEL.threeStarPct);
 
-  return { n: def.n, lanes, pool, picker: finalPicker, spawns, maxScore, passTarget, twoStar, threeStar, seed: def.seed, duration, spawnWindow, currents: def.currents || 0, coral: !!def.coral };
+  return { n: def.n, lanes, pool, picker: finalPicker, spawns, maxScore, passTarget, twoStar, threeStar, seed: def.seed, duration, spawnWindow, currents: def.currents || 0, coral: !!def.coral, anemone: !!def.anemone };
+}
+
+// ---------------------------------------------------------------------------
+// Boss level (L50): the Prism Whale. maxScore == boss HP (the only positive
+// score); minions are threat-only (0 points, -1 if they leak). The Sim spawns
+// the boss segments itself from level.kind/bossHp.
+// ---------------------------------------------------------------------------
+export function compileBossLevel(def) {
+  const rng = makeRng(def.seed);
+  const pool = poolFor(def.colorsInPlay); // full pairs (even) => opposite-closed
+  let picker = pickerFor(pool);
+  // close under opposite so any boss colour's counter is always selectable
+  for (const c of picker.slice()) { const o = opposite(c); if (!picker.includes(o)) picker.push(o); }
+  const lanes = def.lanes;
+  const duration = def.duration || BOSS.duration;
+  const spawnWindow = Math.max(10, duration - 10);
+  const hp = def.bossHp || BOSS.hp;
+
+  // Threat minions: normal fish rows every BOSS.minion.every seconds, avoiding
+  // the center boss lanes so they read as "adds" flanking the whale.
+  const spawns = [];
+  const w = Math.min(BOSS.lanesWide, lanes);
+  const bl0 = Math.floor((lanes - w) / 2);
+  const bossLanes = new Set();
+  for (let i = 0; i < w; i++) bossLanes.add(bl0 + i);
+  const sideLanes = [];
+  for (let l = 0; l < lanes; l++) if (!bossLanes.has(l)) sideLanes.push(l);
+  let t = 4;
+  while (t < spawnWindow) {
+    const size = Math.min(sideLanes.length, rng.int(1, 2));
+    const chosen = rng.shuffle(sideLanes.slice()).slice(0, size).sort((a, b) => a - b);
+    const color = rng.pick(pool);
+    for (const lane of chosen) {
+      spawns.push({ t, lane, kind: 'normal', color, value: 0, minion: true });
+    }
+    t += BOSS.minion.every / FISH_DENSITY;
+  }
+  spawns.sort((a, b) => a.t - b.t);
+
+  // Shuffle picker order (boss is late-game) for consistency with L30+ rule.
+  picker = rng.shuffle(picker.slice());
+
+  const maxScore = hp;
+  return {
+    n: def.n, kind: 'boss', bossHp: hp, lanes, pool, picker, spawns,
+    maxScore, passTarget: Math.ceil(maxScore * LEVEL.passPct),
+    twoStar: Math.ceil(maxScore * LEVEL.twoStarPct),
+    threeStar: Math.ceil(maxScore * LEVEL.threeStarPct),
+    seed: def.seed, duration, spawnWindow, currents: 0, coral: false, anemone: false,
+  };
 }
 
 function pickRowLanes(rng, laneCount, sizeMin, sizeMax) {

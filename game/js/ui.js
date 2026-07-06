@@ -1,9 +1,10 @@
 // ui.js — DOM screens + HUD, one state machine. Reads/writes via the game object.
 import { COLORS } from './config.js';
-import { POWERUPS, INV_CAP, LEVEL, DEEP, COOLDOWN_ENABLED } from './config.js';
+import { POWERUPS, INV_CAP, LEVEL, DEEP, COOLDOWN_ENABLED,
+  LEGACY_UPGRADES, legacyMaxBuys, legacyValue, BOSS_LEVEL } from './config.js';
 import { LEVELS } from './levels.js';
 
-const SCREENS = ['title', 'map', 'prelevel', 'game', 'results', 'shop', 'settings', 'codes'];
+const SCREENS = ['title', 'map', 'prelevel', 'game', 'results', 'shop', 'settings', 'codes', 'legacy'];
 
 // Starfish icon (inline SVG) — the game's currency & level rating.
 // Chunky rounded 5-armed sea-star (fat quadratic-bezier arms) with bump spots.
@@ -56,6 +57,7 @@ export class UI {
         <div class="map-title">Choose a Level</div>
         <div class="level-grid" id="level-grid"></div>
         <button class="btn deep-btn" data-action="deep" id="map-deep">🌊 The Deep (Endless)</button>
+        <button class="btn legacy-btn" data-action="legacy" id="map-legacy" style="display:none">🐚 Legacy Menu</button>
       </div>
 
       <div class="screen" id="s-prelevel">
@@ -74,6 +76,10 @@ export class UI {
           <button class="hud-btn" data-action="pause">⏸</button>
           <div class="hud-timer" id="hud-timer">1:00</div>
           <div class="hud-score" id="hud-score">0/0</div>
+        </div>
+        <div id="boss-hud" style="display:none">
+          <div class="boss-name" id="boss-name">🐋 Prism Whale</div>
+          <div class="boss-hpbar"><div class="boss-hpfill" id="boss-hpfill"></div></div>
         </div>
         <div id="powerup-dock"></div>
         <div id="picker"></div>
@@ -133,6 +139,20 @@ export class UI {
         </div>
       </div>
 
+      <div class="screen" id="s-legacy">
+        <div class="card wide">
+          <div class="card-level">🐚 Legacy</div>
+          <div class="legacy-top">
+            <div class="chip star-chip big">${SF_BIG} <span id="legacy-starfish">0</span></div>
+            <div class="chip seahorse-chip" title="Seahorse Trophies">🌊🐴 <span id="legacy-seahorses">0</span></div>
+          </div>
+          <div class="legacy-note" id="legacy-note"></div>
+          <div class="legacy-grid" id="legacy-grid"></div>
+          <button class="btn btn-danger" data-action="prestige-restart" id="legacy-restart">♻️ Restart Journey (+1 🐴)</button>
+          <button class="btn btn-primary" data-action="back-map">Back</button>
+        </div>
+      </div>
+
       <div class="overlay" id="pause-overlay">
         <div class="card">
           <div class="card-level">Paused</div>
@@ -171,6 +191,9 @@ export class UI {
       case 'install': g.promptInstall(); break;
       case 'title': g.goToTitle(); break;
       case 'deep': g.startDeep(); break;
+      case 'legacy': g.openLegacy(); break;
+      case 'buy-legacy': g.buyLegacy(el.dataset.legacy); break;
+      case 'prestige-restart': g.confirmPrestige(); break;
       case 'settings': g.openSettings(); break;
       case 'open-codes': g.openCodes(); break;
       case 'submit-code': g.submitCode(document.getElementById('code-input').value); break;
@@ -197,7 +220,7 @@ export class UI {
       const el = document.getElementById('s-' + s);
       if (el) el.classList.toggle('active', s === screen);
     }
-    if (screen !== 'game') this.hidePause();
+    if (screen !== 'game') { this.hidePause(); this.updateBossHud(null); }
   }
 
   // ---- Title / Map -------------------------------------------------------
@@ -210,20 +233,73 @@ export class UI {
       const unlocked = godMode || n <= saveData.furthestLevel;
       const stars = saveData.bestStars[n] || 0;
       const b = document.createElement('button');
-      b.className = 'level-bubble' + (unlocked ? '' : ' locked') + (n === saveData.furthestLevel ? ' current' : '');
-      b.innerHTML = `<span class="lvl-n">${n}</span><span class="lvl-stars">${starStr(stars)}</span>`;
+      const isBoss = n === BOSS_LEVEL;
+      b.className = 'level-bubble' + (unlocked ? '' : ' locked') + (n === saveData.furthestLevel ? ' current' : '') + (isBoss ? ' boss' : '');
+      b.innerHTML = `<span class="lvl-n">${isBoss ? '🐋' : n}</span><span class="lvl-stars">${starStr(stars)}</span>`;
       if (unlocked) { b.dataset.action = 'start-level'; b.dataset.level = n; }
       grid.appendChild(b);
     }
     const deepBtn = document.getElementById('map-deep');
-    const deepUnlocked = godMode || saveData.furthestLevel > DEEP.unlockLevel || saveData.bestStars[40];
+    const deepUnlocked = godMode || saveData.bossDefeated || saveData.furthestLevel > DEEP.unlockLevel;
     deepBtn.style.display = deepUnlocked ? '' : 'none';
     document.getElementById('btn-deep').style.display = deepUnlocked ? '' : 'none';
+    // Legacy menu becomes visible once the boss has ever been beaten (or has
+    // upgrades/seahorses from a prior run).
+    const legBtn = document.getElementById('map-legacy');
+    const legacyVisible = godMode || saveData.bossDefeated || (saveData.seahorses || 0) > 0
+      || Object.values(saveData.legacy || {}).some((v) => v > 0);
+    if (legBtn) legBtn.style.display = legacyVisible ? '' : 'none';
+  }
+
+  // Boss HP bar (shown only during the boss level).
+  updateBossHud(boss) {
+    const hud = document.getElementById('boss-hud');
+    if (!hud) return;
+    if (!boss) { hud.style.display = 'none'; return; }
+    hud.style.display = '';
+    const frac = boss.maxHp > 0 ? Math.max(0, boss.hp / boss.maxHp) : 0;
+    const fill = document.getElementById('boss-hpfill');
+    if (fill) fill.style.width = (frac * 100).toFixed(1) + '%';
+    const name = document.getElementById('boss-name');
+    if (name) name.textContent = `🐋 Prism Whale — Phase ${boss.phase}`;
+  }
+
+  // ---- Legacy menu -------------------------------------------------------
+  renderLegacy(saveData) {
+    const godMode = this.game && this.game.godMode;
+    document.getElementById('legacy-starfish').innerHTML = godMode ? '∞' : saveData.starfish;
+    document.getElementById('legacy-seahorses').textContent = saveData.seahorses || 0;
+    const locked = !saveData.bossDefeated;
+    const note = document.getElementById('legacy-note');
+    note.textContent = locked
+      ? 'Upgrades are locked until you defeat the Prism Whale again. Your permanent bonuses below still apply.'
+      : 'Spend starfish on permanent upgrades — they persist through every restart.';
+    const grid = document.getElementById('legacy-grid');
+    grid.innerHTML = '';
+    for (const id in LEGACY_UPGRADES) {
+      const u = LEGACY_UPGRADES[id];
+      const buys = (saveData.legacy && saveData.legacy[id]) || 0;
+      const maxBuys = legacyMaxBuys(id);
+      const atCap = buys >= maxBuys;
+      const pct = Math.round(legacyValue(id, buys) * 100);
+      const canBuy = !locked && !atCap && (godMode || saveData.starfish >= u.cost);
+      const row = document.createElement('div');
+      row.className = 'legacy-item' + (atCap ? ' maxed' : '') + (locked ? ' locked' : '');
+      row.innerHTML =
+        `<div class="li-icon">${u.icon}</div>` +
+        `<div class="li-body"><div class="li-name">${u.name} <span class="li-cur">(${pct}%${atCap ? ' • MAX' : ''})</span></div>` +
+        `<div class="li-desc">${u.desc}</div>` +
+        `<div class="li-pips">${'●'.repeat(buys)}${'○'.repeat(Math.max(0, maxBuys - buys))}</div></div>` +
+        `<button class="btn btn-small li-buy" data-action="buy-legacy" data-legacy="${id}" ${canBuy ? '' : 'disabled'}>${atCap ? 'MAX' : `${SF_SM}${u.cost}`}</button>`;
+      grid.appendChild(row);
+    }
+    const restart = document.getElementById('legacy-restart');
+    if (restart) restart.disabled = locked;
   }
 
   // Show/hide the title's The Deep button based on unlock state.
   renderTitle(saveData, godMode = false) {
-    const deepUnlocked = godMode || saveData.furthestLevel > DEEP.unlockLevel || saveData.bestStars[40];
+    const deepUnlocked = godMode || saveData.bossDefeated || saveData.furthestLevel > DEEP.unlockLevel;
     document.getElementById('btn-deep').style.display = deepUnlocked ? '' : 'none';
   }
 
@@ -328,7 +404,10 @@ export class UI {
 
   // ---- Results -----------------------------------------------------------
   renderResults(res) {
-    document.getElementById('res-title').textContent = res.passed ? 'Level Complete!' : 'The current was strong…';
+    const isBoss = !!res.boss;
+    document.getElementById('res-title').textContent = isBoss
+      ? (res.bossWon ? '🐋 The Prism Whale is at peace!' : 'The Whale endures…')
+      : (res.passed ? 'Level Complete!' : 'The current was strong…');
     const pct = res.maxScore ? Math.min(1, res.score / res.maxScore) : 0;
     document.getElementById('res-fill').style.width = Math.round(pct * 100) + '%';
     document.querySelector('.thr1').style.left = (LEVEL.passPct * 100) + '%';
@@ -337,10 +416,34 @@ export class UI {
     document.getElementById('res-score').textContent = `${res.score} / ${res.maxScore}`;
     document.getElementById('res-stars').innerHTML = starStr(res.stars);
     const earn = document.getElementById('res-earn');
-    earn.innerHTML = res.earned > 0 ? `+${res.earned} ${SF_SM}` : (res.passed ? 'No new starfish' : 'Try again!');
+    if (res.bossFirstClear) {
+      earn.innerHTML = `+${res.earned} ${SF_SM} • 🐚 Legacy unlocked!`;
+    } else {
+      earn.innerHTML = res.earned > 0 ? `+${res.earned} ${SF_SM}` : (res.passed ? 'No new starfish' : 'Try again!');
+    }
     const next = document.getElementById('res-next');
-    next.textContent = res.passed ? 'Next ▶' : 'Retry';
-    next.dataset.action = res.passed ? 'next' : 'retry';
+    if (res.boss && res.bossWon) {
+      next.textContent = '🐚 Legacy';
+      next.dataset.action = 'legacy';
+    } else {
+      next.textContent = res.passed ? 'Next ▶' : 'Retry';
+      next.dataset.action = res.passed ? 'next' : 'retry';
+    }
+    // Optional Legacy shortcut once unlocked.
+    let legBtn = document.getElementById('res-legacy');
+    if (res.legacyUnlocked) {
+      if (!legBtn) {
+        legBtn = document.createElement('button');
+        legBtn.id = 'res-legacy';
+        legBtn.className = 'btn';
+        legBtn.dataset.action = 'legacy';
+        legBtn.textContent = '🐚 Legacy';
+        document.querySelector('#s-results .res-buttons').appendChild(legBtn);
+      }
+      legBtn.style.display = '';
+    } else if (legBtn) {
+      legBtn.style.display = 'none';
+    }
   }
 
   // ---- Shop --------------------------------------------------------------

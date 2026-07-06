@@ -5,7 +5,7 @@
 import {
   FIELD, SPEED, COOLDOWN, LEVEL, POINTS, POWERUPS, INV_CAP,
   cooldownFor, opposite, isCounter, COLORS,
-  ROW_YS, CURRENT, CORAL,
+  ROW_YS, CURRENT, CORAL, ANEMONE, BOSS,
 } from './config.js';
 import { makeRng } from './rng.js';
 
@@ -24,6 +24,7 @@ function remainingValue(f) {
 // if ANY color advances it (white/black at phase 0).
 function requiredPlayerColor(f) {
   if (f.kind === 'normal') return opposite(f.color);
+  if (f.kind === 'boss') return opposite(f.color); // hit boss segment with its opposite
   if (f.kind === 'tri') return opposite(f.bands[f.phase]);
   if (f.kind === 'white') {
     if (f.phase === 0) return null;        // any color transforms
@@ -55,6 +56,16 @@ export class Sim {
     this.maxScore = level.maxScore;
     this.lanes = level.lanes;
 
+    // Legacy (prestige) upgrade effect values (fractions). Default: no bonus.
+    const lg = opts.legacy || {};
+    this.legacy = {
+      fishSpeed: lg.fishSpeed || 0,
+      friendSlow: lg.friendSlow || 0,
+      rainbowChance: lg.rainbowChance || 0,
+      freeShark: lg.freeShark || 0,
+    };
+    this._freeSharkRolled = false;
+
     this.enemies = [];
     this.players = [];
     this.spawnCursor = 0;
@@ -77,6 +88,9 @@ export class Sim {
     this.squidEats = 0;    // squid eats accumulator (2 eaten => +1)
 
     this._initHazards();
+    this.boss = null;
+    this.bossWon = false;
+    if (level.kind === 'boss') this._initBoss();
 
     this._resolvedCount = 0; // scripted spawns that have been spawned
   }
@@ -111,6 +125,66 @@ export class Sim {
         gone: false,
       };
     }
+    // Color-shift anemone (single cell that repaints enemies crossing it).
+    this.anemone = null;
+    if (this.level.anemone) {
+      const row = this.rng.pick(ANEMONE.candidateRows);
+      this.anemone = {
+        id: 'anem',
+        lane: this.rng.int(0, this.lanes - 1),
+        rowY: ROW_YS[row],
+        _step: 0,
+      };
+    }
+  }
+
+  // Anemone hops to a new lane on a cadence; when an enemy fish crosses its
+  // cell it is repainted to a new random colour from the pool (once per fish).
+  updateAnemone() {
+    const a = this.anemone;
+    if (!a) return;
+    const step = Math.floor(this.time / ANEMONE.moveInterval);
+    if (step !== a._step) {
+      a._step = step;
+      const nl = this.rng.int(0, this.lanes - 1);
+      if (nl !== a.lane) { a.lane = nl; this.emit('anemoneMove', { lane: a.lane }); }
+    }
+  }
+  applyAnemone() {
+    const a = this.anemone;
+    if (!a) return;
+    const pool = this.level.pool;
+    for (const f of this.enemies) {
+      if (!f.alive || f.boss) continue;
+      if (f.lane !== a.lane) continue;
+      if (Math.abs(f.y - a.rowY) > ANEMONE.band) continue;
+      if (!f._shifted) f._shifted = new Set();
+      if (f._shifted.has(a.id)) continue;
+      f._shifted.add(a.id);
+      this._repaint(f, pool);
+    }
+  }
+  // Repaint an enemy fish to a new colour (different from its current one).
+  _repaint(f, pool) {
+    const pickNew = (cur) => {
+      let c = this.rng.pick(pool);
+      let guard = 0;
+      while (c === cur && pool.length > 1 && guard++ < 8) c = this.rng.pick(pool);
+      return c;
+    };
+    if (f.kind === 'normal') {
+      f.color = pickNew(f.color);
+      this.emit('anemoneShift', { id: f.id, lane: f.lane, to: f.color });
+    } else if (f.kind === 'tri') {
+      // repaint the current front band the player still has to counter
+      const cur = f.bands[f.phase];
+      f.bands[f.phase] = pickNew(cur);
+      this.emit('anemoneShift', { id: f.id, lane: f.lane, to: f.bands[f.phase] });
+    } else if ((f.kind === 'white' || f.kind === 'black') && f.phase === 1) {
+      f.color = pickNew(f.color);
+      this.emit('anemoneShift', { id: f.id, lane: f.lane, to: f.color });
+    }
+    // phase-0 white/black have no colour yet -> nothing to shift.
   }
 
   // Effective current direction (flips every flipInterval seconds).
@@ -129,7 +203,7 @@ export class Sim {
     }
   }
   _maybePush(f, c, dir) {
-    if (!f.alive) return;
+    if (!f.alive || f.boss) return;
     if (Math.abs(f.y - c.rowY) > CURRENT.band) return;
     if (!f._pushed) f._pushed = new Set();
     if (f._pushed.has(c.id)) return;
@@ -167,7 +241,7 @@ export class Sim {
     if (!c) return;
     const stopY = c.rowY + CORAL.stopMargin;
     const inLane = this.enemies
-      .filter((e) => e.alive && e.lane === c.lane)
+      .filter((e) => e.alive && !e.boss && e.lane === c.lane)
       .sort((a, b) => a.y - b.y);
     let floor = stopY;
     for (const e of inLane) {
@@ -186,8 +260,107 @@ export class Sim {
     }
   }
 
-  // ---- public control ----------------------------------------------------
-  cooldownRemaining() { return Math.max(0, this.cooldownUntil - this.time); }
+  // ---- Prism Whale boss --------------------------------------------------
+  _initBoss() {
+    const lvl = this.level;
+    const hp = lvl.bossHp || BOSS.hp;
+    const w = Math.min(BOSS.lanesWide, this.lanes);
+    const l0 = Math.floor((this.lanes - w) / 2);
+    const pool = lvl.pool;
+    const startColor = pool[0];
+    this.boss = {
+      hp, maxHp: hp, phase: 1,
+      l0, w, y: BOSS.y,
+      colorIdx: 0,
+      cyclePeriod: BOSS.cycle.p1,
+      cycleT: 0,
+      perLane: false,
+    };
+    // One damage-shared segment per occupied lane; each is a normal enemy the
+    // collide system / bots handle, flagged boss so it holds station & shares HP.
+    for (let i = 0; i < w; i++) {
+      this.enemies.push({
+        id: fid(), lane: l0 + i, y: BOSS.y, kind: 'boss', boss: true,
+        color: startColor, alive: true, vulnerableAt: 0, weaved: new Set(),
+      });
+    }
+    this.emit('bossSpawn', { hp, lanes: w });
+  }
+
+  bossSegments() { return this.enemies.filter((e) => e.boss && e.alive); }
+
+  updateBoss(dt) {
+    const b = this.boss;
+    if (!b || this.bossWon) return;
+    // Phase transitions by remaining HP.
+    const frac = b.hp / b.maxHp;
+    let phase = 1;
+    if (frac <= BOSS.phaseAt.p3) phase = 3;
+    else if (frac <= BOSS.phaseAt.p2) phase = 2;
+    if (phase !== b.phase) {
+      b.phase = phase;
+      b.cyclePeriod = phase === 3 ? BOSS.cycle.p3 : phase === 2 ? BOSS.cycle.p2 : BOSS.cycle.p1;
+      b.perLane = (phase === 3);
+      this.emit('bossPhase', { phase });
+    }
+    // Colour cycle.
+    b.cycleT += dt;
+    if (b.cycleT >= b.cyclePeriod) {
+      b.cycleT -= b.cyclePeriod;
+      const pool = this.level.pool;
+      b.colorIdx = (b.colorIdx + 1) % pool.length;
+      const segs = this.bossSegments();
+      if (b.perLane) {
+        // every lane gets its own colour
+        for (const s of segs) s.color = pool[this.rng.int(0, pool.length - 1)];
+      } else {
+        const c = pool[b.colorIdx];
+        for (const s of segs) s.color = c;
+      }
+      this.emit('bossCycle', { phase: b.phase });
+    }
+    // Gentle vertical bob (visual; also used by collide radius).
+    b.y = BOSS.y + Math.sin(this.time * 1.6) * BOSS.bob;
+    for (const s of this.bossSegments()) s.y = b.y;
+    this.score = b.maxHp - b.hp; // keep score == net boss progress every tick
+  }
+
+  // Boss collision: a player fish reaching a boss segment deals 1 damage if it
+  // counters the segment's current colour, or HEALS the boss by 1 if it's the
+  // wrong colour. This makes an always-wrong-colour player unable to win while
+  // a correct player grinds the boss down. Paced by a per-segment cooldown.
+  bossCollide() {
+    const b = this.boss;
+    if (!b || this.bossWon) return;
+    const R = BOSS.hitRadius;
+    for (const seg of this.enemies) {
+      if (!seg.boss || !seg.alive) continue;
+      if (this.time < seg.vulnerableAt) continue; // inert -> let fish pass
+      // nearest player fish in this lane within the body band
+      let p = null, best = Infinity;
+      for (const q of this.players) {
+        if (!q.alive || q.lane !== seg.lane) continue;
+        const d = Math.abs(q.y - seg.y);
+        if (d < R && d < best) { best = d; p = q; }
+      }
+      if (!p) continue;
+      p.alive = false; // fish consumed on contact
+      seg.vulnerableAt = this.time + BOSS.segCooldown;
+      if (playerActsOn(p.color, seg)) {
+        b.hp = Math.max(0, b.hp - 1);
+        this.emit('bossHit', { lane: seg.lane, hp: b.hp, maxHp: b.maxHp });
+        if (b.hp <= 0) {
+          this.bossWon = true;
+          for (const s of this.enemies) if (s.boss) s.alive = false;
+          this.emit('bossDefeated', {});
+        }
+      } else {
+        b.hp = Math.min(b.maxHp, b.hp + 1); // wrong colour reinvigorates the whale
+        this.emit('bossHeal', { lane: seg.lane, hp: b.hp });
+      }
+      this.score = b.maxHp - b.hp; // score == net damage that stuck
+    }
+  }
   cooldownProgress() {
     if (this.lastCooldownLen <= 0) return 1;
     return Math.min(1, 1 - this.cooldownRemaining() / this.lastCooldownLen);
@@ -204,7 +377,12 @@ export class Sim {
       this.emit('launchDenied', { lanes });
       return false;
     }
-    const useColor = this.effects.rainbow.active ? 'rainbow' : color;
+    // Legacy "Rainbow Instinct": small chance the whole launch becomes rainbow.
+    let useColor = this.effects.rainbow.active ? 'rainbow' : color;
+    if (useColor !== 'rainbow' && this.legacy.rainbowChance > 0
+        && this.rng.chance(this.legacy.rainbowChance)) {
+      useColor = 'rainbow';
+    }
     for (const lane of lanes) {
       this.players.push({ id: fid(), lane, y: FIELD.launchY, color: useColor, alive: true, weaved: new Set() });
     }
@@ -257,14 +435,32 @@ export class Sim {
     this.spawnDue();
     this.moveFish(dt);
     this.applyCurrents();
+    this.updateAnemone();
+    this.applyAnemone();
     this.resolveEnemyStacking();
     this.updateCoral();
     this.applyCoral();
+    this.updateBoss(dt);
+    this.rollFreeShark();
     this.updateSharks(dt);
     this.squidPass();
+    this.bossCollide();
     this.collide();
     this.handleLeaksAndExits();
     this.checkEnd();
+  }
+
+  // Legacy "Patrol Shark": once per level, at the 0:30 mark, roll for a free
+  // shark in a random lane. Independent of the shop shark / auto-shark.
+  rollFreeShark() {
+    if (this._freeSharkRolled || this.legacy.freeShark <= 0) return;
+    if (this.time < 30) return;
+    this._freeSharkRolled = true;
+    if (this.rng.chance(this.legacy.freeShark)) {
+      const lane = this.rng.int(0, this.lanes - 1);
+      this.useShark(lane);
+      this.emit('freeShark', { lane });
+    }
   }
 
   spawnDue() {
@@ -280,6 +476,7 @@ export class Sim {
       if (s.kind === 'tri') { f.bands = s.bands.slice(); f.phase = 0; }
       else if (s.kind === 'white' || s.kind === 'black') { f.phase = 0; f.color = null; }
       else { f.color = s.color; }
+      if (s.minion) f.minion = true; // boss-fight minion: threat only, 0 points
       this.enemies.push(f);
       this._resolvedCount++;
       this.emit('spawn', { id: f.id, lane: f.lane, kind: f.kind });
@@ -287,16 +484,23 @@ export class Sim {
   }
 
   enemySpeed(f) {
+    if (f.boss) return 0; // boss segments hold station
     let s = SPEED.enemyBase * (this.level.speedMult || 1);
     if (f.kind === 'white' && f.phase === 0) s *= SPEED.whiteMult;
     if (f.kind === 'tri') s *= SPEED.triMult;
     if (this.effects.ice.active) s *= SPEED.iceMult;
+    // Legacy "Sluggish Tide": permanently slow enemy fish.
+    if (this.legacy.friendSlow) s *= (1 - this.legacy.friendSlow);
     return s;
   }
 
+  // Player fish ascend speed, boosted by the Legacy "Swift Fins" upgrade.
+  playerSpeed() { return SPEED.player * (1 + this.legacy.fishSpeed); }
+
   moveFish(dt) {
-    for (const e of this.enemies) { if (e.alive) e.y -= this.enemySpeed(e) * dt; }
-    for (const p of this.players) { if (p.alive) p.y += SPEED.player * dt; }
+    for (const e of this.enemies) { if (e.alive && !e.boss) e.y -= this.enemySpeed(e) * dt; }
+    const ps = this.playerSpeed();
+    for (const p of this.players) { if (p.alive) p.y += ps * dt; }
   }
 
   // Prevent enemy fish from piling up / overtaking within a lane. A faster fish
@@ -307,7 +511,7 @@ export class Sim {
     const gap = FIELD.enemyFollowGap;
     const byLane = new Map();
     for (const e of this.enemies) {
-      if (!e.alive) continue;
+      if (!e.alive || e.boss) continue;
       let arr = byLane.get(e.lane);
       if (!arr) { arr = []; byLane.set(e.lane, arr); }
       arr.push(e);
@@ -330,7 +534,7 @@ export class Sim {
       sh.y += SPEED.player * SPEED.sharkMult * dt; // half the speed of a player fish
       // Eat any enemy in shark lanes within the shark's (big) body band.
       for (const e of this.enemies) {
-        if (!e.alive) continue;
+        if (!e.alive || e.boss) continue;
         if (!sh.lanes.includes(e.lane)) continue;
         if (e.y <= sh.y + 0.14 && e.y >= sh.y - 0.16) {
           const val = remainingValue(e); // shark scores the fish's full remaining value
@@ -347,7 +551,7 @@ export class Sim {
   squidPass() {
     if (!this.effects.squid.active) return;
     for (const e of this.enemies) {
-      if (!e.alive) continue;
+      if (!e.alive || e.boss) continue;
       if (!this.isInteriorLane(e.lane)) continue;
       if (e.y <= this.squidY) {
         e.alive = false; // eaten
@@ -366,7 +570,7 @@ export class Sim {
     const R = FIELD.collideRadiusY;
     const claimed = new Set(); // enemy ids resolved/advanced this collision pass
     for (let lane = 0; lane < this.lanes; lane++) {
-      const es = this.enemies.filter((e) => e.alive && e.lane === lane);
+      const es = this.enemies.filter((e) => e.alive && !e.boss && e.lane === lane);
       const ps = this.players.filter((p) => p.alive && p.lane === lane);
       if (es.length === 0 || ps.length === 0) continue;
       // players sorted by y descending (closest to enemies resolves first).
@@ -402,7 +606,7 @@ export class Sim {
     p.alive = false; // player fish consumed
     if (f.kind === 'normal') {
       f.alive = false;
-      this.addScore(POINTS.normal);
+      this.addScore(f.minion ? 0 : POINTS.normal); // boss minions score 0
       this.kills++;
       this.emit('fishKilled', { id: f.id, lane: f.lane, color: f.color, playerColor: p.color });
       this.emit('friendPair', { lane: f.lane, colorA: f.color, colorB: p.color, y: f.y });
@@ -457,7 +661,7 @@ export class Sim {
     for (const e of this.enemies) {
       if (e.alive && e.y <= FIELD.bottomLeakY) {
         e.alive = false;
-        this.addScore(-1);
+        if (!e.minion) this.addScore(-1); // boss minions are threat-only, no score
         this.leaks++;
         this.emit('leak', { lane: e.lane, kind: e.kind });
       }
@@ -467,11 +671,14 @@ export class Sim {
         p.alive = false;
         this.emit('playerExit', { lane: p.lane });
         // Wasted fish: every 2 that escape the top without a hit cost 1 point.
-        this.wastedFish++;
-        if (this.wastedFish >= 2) {
-          this.wastedFish -= 2;
-          this.addScore(-1);
-          this.emit('wastePenalty', { lane: p.lane });
+        // Not applied on the boss level (fish sail past the big cycling body).
+        if (this.level.kind !== 'boss') {
+          this.wastedFish++;
+          if (this.wastedFish >= 2) {
+            this.wastedFish -= 2;
+            this.addScore(-1);
+            this.emit('wastePenalty', { lane: p.lane });
+          }
         }
       }
     }
@@ -483,10 +690,27 @@ export class Sim {
 
   checkEnd() {
     if (this.endless) return; // Game controls endless termination (life-based)
+    const dur = this.level.duration || LEVEL.duration;
+    const timeUp = this.time >= dur;
+    // Boss level: win the instant the boss is defeated; lose if the clock runs
+    // out with the boss still alive.
+    if (this.level.kind === 'boss') {
+      if (this.bossWon || timeUp) {
+        if (!this.bossWon) for (const s of this.enemies) if (s.boss) s.alive = false;
+        this.enemies = this.enemies.filter((e) => e.alive);
+        this.ended = true;
+        const stars = this.starsForScore(this.score);
+        this.emit('levelEnd', {
+          score: this.score, maxScore: this.maxScore, stars,
+          passTarget: this.level.passTarget, passed: this.bossWon,
+          boss: true, bossWon: this.bossWon,
+        });
+      }
+      return;
+    }
     // The level ends only once every enemy fish is off the screen, and no new
     // fish spawn after the timer ends. So: end when there are no enemies left
     // AND either all scripted fish have spawned or the timer has run out.
-    const timeUp = this.time >= (this.level.duration || LEVEL.duration);
     const noMoreSpawns = this.allSpawned() || timeUp;
     if (noMoreSpawns && this.enemies.length === 0) {
       this.ended = true;
@@ -512,7 +736,9 @@ export class Sim {
       lanes: this.lanes, ended: this.ended,
       enemies: this.enemies, players: this.players, sharks: this.sharks,
       effects: this.effects, cooldown: this.cooldownProgress(),
-      currents: this.currents, coral: this.coral,
+      currents: this.currents, coral: this.coral, anemone: this.anemone,
+      boss: this.boss ? { hp: this.boss.hp, maxHp: this.boss.maxHp, phase: this.boss.phase,
+                          l0: this.boss.l0, w: this.boss.w, y: this.boss.y, won: this.bossWon } : null,
     };
   }
 }

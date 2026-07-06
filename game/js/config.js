@@ -7,7 +7,7 @@
 // so colorblind players read "opposite" by marking, not hue), and its opposite.
 // Pairs: Blue<->Orange (stripes), Red<->Green (dots), Yellow<->Purple (chevrons).
 // ---------------------------------------------------------------------------
-export const PATTERNS = { STRIPES: 0, DOTS: 1, CHEVRONS: 2 };
+export const PATTERNS = { STRIPES: 0, DOTS: 1, CHEVRONS: 2, GRID: 3, WAVES: 4, TRIANGLES: 5 };
 
 export const COLORS = {
   blue:   { id: 'blue',   name: 'Blue',   hex: 0x2f7be6, css: '#2f7be6', pattern: PATTERNS.STRIPES,  opposite: 'orange' },
@@ -16,7 +16,32 @@ export const COLORS = {
   green:  { id: 'green',  name: 'Green',  hex: 0x35b84a, css: '#35b84a', pattern: PATTERNS.DOTS,     opposite: 'red'    },
   yellow: { id: 'yellow', name: 'Yellow', hex: 0xf4d21e, css: '#f4d21e', pattern: PATTERNS.CHEVRONS, opposite: 'purple' },
   purple: { id: 'purple', name: 'Purple', hex: 0x9a4fd0, css: '#9a4fd0', pattern: PATTERNS.CHEVRONS, opposite: 'yellow' },
+  // Extra opposite pairs, unlocked only by Legacy prestige (each restart adds a pair).
+  teal:    { id: 'teal',    name: 'Teal',    hex: 0x1fb6a6, css: '#1fb6a6', pattern: PATTERNS.GRID,      opposite: 'pink'    },
+  pink:    { id: 'pink',    name: 'Pink',    hex: 0xf25fa0, css: '#f25fa0', pattern: PATTERNS.GRID,      opposite: 'teal'    },
+  lime:    { id: 'lime',    name: 'Lime',    hex: 0x8bd41f, css: '#8bd41f', pattern: PATTERNS.WAVES,     opposite: 'magenta' },
+  magenta: { id: 'magenta', name: 'Magenta', hex: 0xc026d3, css: '#c026d3', pattern: PATTERNS.WAVES,     opposite: 'lime'    },
+  gold:    { id: 'gold',    name: 'Gold',    hex: 0xd9a521, css: '#d9a521', pattern: PATTERNS.TRIANGLES, opposite: 'indigo'  },
+  indigo:  { id: 'indigo',  name: 'Indigo',  hex: 0x4f46e5, css: '#4f46e5', pattern: PATTERNS.TRIANGLES, opposite: 'gold'    },
 };
+
+// Colors ordered by opposite-pair. The first 2N entries are always closed under
+// `opposite` (required for black-fish soft-lock safety). Base game uses the
+// first 3 pairs (6 colors); each Legacy prestige adds one more pair.
+export const ORDERED_PAIRS = [
+  ['blue', 'orange'], ['red', 'green'], ['yellow', 'purple'],
+  ['teal', 'pink'], ['lime', 'magenta'], ['gold', 'indigo'],
+];
+export const BASE_PAIRS = 3;               // pairs available in the un-prestiged game
+export const MAX_PAIRS = ORDERED_PAIRS.length; // 6 pairs = 12 colors, hard cap
+
+// Ordered color-id list for a given number of pairs (always opposite-closed).
+export function colorIdsForPairs(pairs) {
+  const p = Math.max(1, Math.min(MAX_PAIRS, pairs));
+  const ids = [];
+  for (let i = 0; i < p; i++) { ids.push(ORDERED_PAIRS[i][0], ORDERED_PAIRS[i][1]); }
+  return ids;
+}
 
 export const ALL_COLOR_IDS = Object.keys(COLORS);
 
@@ -158,10 +183,92 @@ export const FISH_DENSITY = 0.9;
 // Endless "The Deep".
 // ---------------------------------------------------------------------------
 export const DEEP = {
-  unlockLevel: 40,
+  unlockLevel: 50,    // The Deep unlocks after the L50 boss
   metersPer30s: 10,
   starfishPer: 100,   // +1 starfish per 100m
 };
+
+// ---------------------------------------------------------------------------
+// Total authored levels (campaign) and the boss level.
+// ---------------------------------------------------------------------------
+export const TOTAL_LEVELS = 50;
+export const BOSS_LEVEL = 50;
+
+// ---------------------------------------------------------------------------
+// Color-shift anemone (new mechanic, from L46). A grid cell that repaints any
+// enemy fish crossing it to a new random color from the level pool. Players,
+// sharks and the squid are unaffected (like currents).
+// ---------------------------------------------------------------------------
+export const ANEMONE = {
+  from: 46,                     // anemones appear from this level
+  band: 0.045,                  // crossing detection half-height
+  moveInterval: 8,              // hops to a new lane every N seconds
+  candidateRows: [1, 2, 3, 4],  // never the row nearest the beach or the top
+};
+
+// ---------------------------------------------------------------------------
+// Prism Whale boss (L50). Modeled as one damage-shared creature with a segment
+// per occupied lane; hit a segment with the OPPOSITE of its current color to
+// deal 1 damage, then that segment goes briefly invulnerable. 3 phases scale the
+// colour-cycle speed; the final phase gives every lane its own colour.
+// ---------------------------------------------------------------------------
+export const BOSS = {
+  hp: 60,                       // total hits to defeat (base; +12 per prestige)
+  hpPerPrestige: 12,
+  duration: 150,                // boss level clock (seconds)
+  lanesWide: 5,                 // number of body segments (center lanes)
+  y: 0.34,                      // low body => short travel so shots land fresh
+  bob: 0.015,                   // vertical bob amplitude
+  segCooldown: 0.9,             // seconds a segment is inert after any contact
+  hitRadius: 0.07,              // contact half-height (big body)
+  cycle: { p1: 4.5, p2: 3.4, p3: 2.4 }, // colour-cycle period per phase (s)
+  phaseAt: { p2: 0.66, p3: 0.33 },      // hp fraction thresholds for phases 2 & 3
+  minion: { every: 6, speedMult: 1.0 }, // spawn a minion row every N seconds
+};
+
+// ---------------------------------------------------------------------------
+// Legacy (prestige) upgrades. Each purchase applies `per` up to `cap`.
+// ---------------------------------------------------------------------------
+export const LEGACY_UPGRADES = {
+  fishSpeed:     { id: 'fishSpeed',     name: 'Swift Fins',       icon: '⚡', cost: 3, per: 0.01, cap: 0.20, kind: 'pct',
+                   desc: '+1% player fish speed (max +20%)' },
+  friendSlow:    { id: 'friendSlow',    name: 'Sluggish Tide',    icon: '🐌', cost: 3, per: 0.01, cap: 0.20, kind: 'pct',
+                   desc: '-1% enemy fish speed (max -20%)' },
+  rainbowChance: { id: 'rainbowChance', name: 'Rainbow Instinct', icon: '🌈', cost: 5, per: 0.01, cap: 0.10, kind: 'pct',
+                   desc: '+1% chance a drawn fish is rainbow (max 10%)' },
+  freeShark:     { id: 'freeShark',     name: 'Patrol Shark',     icon: '🦈', cost: 5, per: 0.02, cap: 0.20, kind: 'pct',
+                   desc: '+2% chance/level of a free shark at 0:30 (max 20%)' },
+};
+// Max purchases per upgrade = cap / per.
+export function legacyMaxBuys(id) {
+  const u = LEGACY_UPGRADES[id];
+  return u ? Math.round(u.cap / u.per) : 0;
+}
+export function legacyValue(id, buys) {
+  const u = LEGACY_UPGRADES[id];
+  if (!u) return 0;
+  return Math.min(u.cap, (buys || 0) * u.per);
+}
+
+// ---------------------------------------------------------------------------
+// Prestige difficulty ramp. Each restart adds one color pair and pulls the
+// mechanic-intro levels earlier by 5, capped so nothing lands before L5 and the
+// ramp stops growing after PRESTIGE_RAMP_CAP restarts.
+// ---------------------------------------------------------------------------
+export const PRESTIGE_RAMP_CAP = 3;    // difficulty stops increasing beyond this
+export const PRESTIGE_SHIFT_PER = 5;   // levels-earlier per prestige
+export const PRESTIGE_MIN_LEVEL = 5;   // a mechanic never triggers before this
+
+export function prestigePairs(prestige) {
+  return Math.min(MAX_PAIRS, BASE_PAIRS + Math.min(prestige, PRESTIGE_RAMP_CAP));
+}
+export function prestigeShift(prestige) {
+  return Math.min(prestige, PRESTIGE_RAMP_CAP) * PRESTIGE_SHIFT_PER;
+}
+// Apply the prestige "earlier" shift to a base intro level, with a floor.
+export function shiftedIntro(baseLevel, prestige) {
+  return Math.max(PRESTIGE_MIN_LEVEL, baseLevel - prestigeShift(prestige));
+}
 
 // ---------------------------------------------------------------------------
 // Sim tick.

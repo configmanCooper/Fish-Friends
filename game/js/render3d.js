@@ -10,11 +10,15 @@ const H = 10;                 // world height for y in [0,1]
 const MARGIN = 0.05;          // side margin fraction of field width
 const CAP = 256;              // instanced fish capacity
 
-const patternForColor = {};   // colorId -> patternId (0 blank,1 stripes,2 dots,3 chevrons)
+const patternForColor = {};   // colorId -> patternId (0 blank,1 stripes,2 dots,3 chevrons,4 grid,5 waves,6 triangles)
 // stripes for blue/orange, dots for red/green, chevrons for yellow/purple
 patternForColor.blue = 1; patternForColor.orange = 1;
 patternForColor.red = 2; patternForColor.green = 2;
 patternForColor.yellow = 3; patternForColor.purple = 3;
+// prestige pairs: grid for teal/pink, waves for lime/magenta, triangles for gold/indigo
+patternForColor.teal = 4; patternForColor.pink = 4;
+patternForColor.lime = 5; patternForColor.magenta = 5;
+patternForColor.gold = 6; patternForColor.indigo = 6;
 
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
@@ -56,6 +60,7 @@ export class Render3D {
     this._buildSquid();
     this._buildCurrents();
     this._buildCoral();
+    this._buildAnemone();
     this.fx = new ParticleFX(this.scene);
     this.floaters = new Floaters(this.scene);
 
@@ -123,7 +128,35 @@ export class Render3D {
     this.scene.add(group);
   }
 
-  _buildShark() {    this.sharkGeo = buildSharkGeometry();
+  _buildAnemone() {
+    // A cluster of wavy translucent tentacles that repaint fish crossing it.
+    const group = new THREE.Group();
+    this.anemoneTentacles = [];
+    const cols = [0x8b5cf6, 0x22d3ee, 0xf25fa0, 0x8bd41f];
+    for (let i = 0; i < 9; i++) {
+      const h = 0.4 + Math.random() * 0.5;
+      const g = new THREE.CapsuleGeometry(0.05, h, 4, 6);
+      const m = new THREE.MeshLambertMaterial({ color: cols[i % cols.length], transparent: true, opacity: 0.72, emissive: cols[i % cols.length], emissiveIntensity: 0.35 });
+      const b = new THREE.Mesh(g, m);
+      const a = (i / 9) * Math.PI * 2;
+      b.position.set(Math.cos(a) * 0.22, -0.05 + h * 0.4, Math.sin(a) * 0.1);
+      b.userData.phase = Math.random() * Math.PI * 2;
+      b.userData.h = h;
+      group.add(b);
+      this.anemoneTentacles.push(b);
+    }
+    const base = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 8), new THREE.MeshLambertMaterial({ color: 0x6d3f8a }));
+    base.scale.set(1.3, 0.5, 1.0);
+    group.add(base);
+    group.visible = false;
+    group.renderOrder = 2;
+    this.anemoneGroup = group;
+    this.anemoneX = null;
+    this.scene.add(group);
+  }
+
+  _buildShark() {
+    this.sharkGeo = buildSharkGeometry();
     this.sharkMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     this.sharkMeshes = new Map(); // shark id -> mesh
   }
@@ -290,9 +323,9 @@ export class Render3D {
             diffuseColor.rgb = hue2rgb(fract(uTime * 0.25 + vUvF.y));
           }
           if (vPattern > 0.5) {
-            float col = mod(vPattern, 2.0) < 1.0 ? 0.0 : 0.5;
-            float row = vPattern < 2.0 ? 0.5 : 0.0;
-            vec2 uv2 = vec2(col, row) + fract(vUvF) * 0.5;
+            float col = mod(vPattern, 4.0) * 0.25;
+            float row = vPattern < 4.0 ? 0.5 : 0.0;
+            vec2 uv2 = vec2(col, row) + fract(vUvF) * vec2(0.25, 0.5);
             float mask = texture2D(uPattern, uv2).a;
             diffuseColor.rgb *= (1.0 - mask * 0.55);
           }
@@ -384,6 +417,17 @@ export class Render3D {
         this.fx.spawn(this.worldX(e.lane), this.worldY(e.y || 0.5), 0.6, 0xff9ab0, { count: 6, speed: 0.5, size: 6 });
       } else if (e.type === 'currentPush') {
         this.fx.spawn(this.worldX(e.lane), this.worldY(0.5), 0.6, 0x9fdcff, { count: 3, speed: 0.3, size: 5, life: 0.3 });
+      } else if (e.type === 'anemoneShift') {
+        const hex = e.to && COLORS[e.to] ? COLORS[e.to].hex : 0xa970ff;
+        this.fx.spawn(this.worldX(e.lane), this.worldY(0.5), 0.6, hex, { count: 12, speed: 0.7, size: 6 });
+        this.floaters.spawn(this.worldX(e.lane), this.worldY(0.5), 1, '✦');
+      } else if (e.type === 'bossHit') {
+        this.fx.spawn(this.worldX(e.lane), this.worldY(0.34), 0.6, 0xffef9a, { count: 10, speed: 0.9 });
+        this.floaters.spawn(this.worldX(e.lane), this.worldY(0.34), 1, '-1');
+      } else if (e.type === 'bossHeal') {
+        this.fx.spawn(this.worldX(e.lane), this.worldY(0.34), 0.6, 0x6affa0, { count: 8, speed: 0.6 });
+      } else if (e.type === 'bossDefeated') {
+        for (let i = 0; i < 6; i++) this.fx.spawn(this.worldX(Math.floor(this.laneCount / 2)) + (Math.random() - 0.5) * 2, this.worldY(0.4), 0.8, 0xffe37a, { count: 22, speed: 1.4, life: 1.1 });
       }
     }
   }
@@ -427,6 +471,7 @@ export class Render3D {
     this._updateSquid(sim);
     this._updateCurrents(sim);
     this._updateCoral(sim);
+    this._updateAnemone(sim);
     this.fx.update(dt);
     this.floaters.update(dt);
     this.renderer.render(this.scene, this.camera);
@@ -462,6 +507,20 @@ export class Render3D {
     this.coralGroup.visible = true;
     this.coralGroup.position.set(this.coralX, this.worldY(coral.rowY), 0.5);
     this.coralGroup.rotation.y = this.time * 0.3;
+  }
+
+  _updateAnemone(sim) {
+    const an = (sim && !sim.ended) ? sim.anemone : null;
+    if (!an) { if (this.anemoneGroup.visible) { this.anemoneGroup.visible = false; this.anemoneX = null; } return; }
+    const targetX = this.worldX(an.lane);
+    if (this.anemoneX === null) this.anemoneX = targetX;
+    else this.anemoneX += (targetX - this.anemoneX) * Math.min(1, 0.18);
+    this.anemoneGroup.visible = true;
+    this.anemoneGroup.position.set(this.anemoneX, this.worldY(an.rowY), 0.5);
+    // sway the tentacles
+    for (const t of this.anemoneTentacles) {
+      t.rotation.z = Math.sin(this.time * 2.0 + t.userData.phase) * 0.35;
+    }
   }
 
   // lane pitch in world units
@@ -597,6 +656,8 @@ export class Render3D {
         } else if (e.kind === 'black') {
           if (e.phase === 0) { colorId = 0x222630; patternId = 0; scale = 0.66; }
           else { colorId = e.color; patternId = patternForColor[e.color] || 0; }
+        } else if (e.kind === 'boss') {
+          colorId = e.color; patternId = patternForColor[e.color] || 0; scale = 1.5;
         } else {
           colorId = e.color; patternId = patternForColor[e.color] || 0;
         }

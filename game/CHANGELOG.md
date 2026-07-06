@@ -2,6 +2,20 @@
 
 All notable changes to Fish Friends.
 
+## [1.22.0] — 2026-07-06
+- **10 new levels + a boss (now 50 levels).** The campaign runs to Level 50, which
+  is a 3-phase **Prism Whale** boss fight: the whale cycles colours (per-lane in
+  its final phase) — hit each body segment with its opposite to damage it; wrong
+  colours heal it. HP bar shown top-of-screen.
+- **New mechanic — Color-shift Anemone (L46+).** A drifting anemone repaints any
+  enemy fish that crosses it, forcing a fresh read.
+- **Legacy (prestige) system.** Beating the boss unlocks the **Legacy** menu:
+  spend leftover starfish on permanent upgrades — Swift Fins (+player speed),
+  Sluggish Tide (−enemy speed), Rainbow Instinct (rainbow-draw chance) and Patrol
+  Shark (free shark at 0:30). Restart your journey any time to keep upgrades, earn
+  a **Seahorse Trophy**, and face harder seas (one extra colour and mechanics 5
+  levels earlier per restart). Upgrades lock until you beat the boss again.
+
 ## [1.21.0] — 2026-07-06
 - **No more fish pile-ups:** enemy fish in the same lane no longer stack on or
   overtake each other. When a faster fish (e.g. a normal fish behind a slower
