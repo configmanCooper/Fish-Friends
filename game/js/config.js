@@ -250,8 +250,8 @@ export const LEGACY_UPGRADES = {
                    desc: '-1% enemy fish speed (max -20%)' },
   rainbowChance: { id: 'rainbowChance', name: 'Rainbow Instinct', icon: '🌈', cost: 5, per: 0.01, cap: 0.10, kind: 'pct',
                    desc: '+1% chance a drawn fish is rainbow (max 10%)' },
-  freeShark:     { id: 'freeShark',     name: 'Patrol Shark',     icon: '🦈', cost: 5, per: 0.02, cap: 0.20, kind: 'pct',
-                   desc: '+2% chance/level of a free shark at 0:30 (max 20%)' },
+  freeShark:     { id: 'freeShark',     name: 'Patrol Shark',     icon: '🦈', cost: 5, per: 0.05, cap: 0.50, kind: 'pct',
+                   desc: '+5% chance/level of a free shark at 0:30 (max 50%)' },
 };
 // Max purchases per upgrade = cap / per.
 export function legacyMaxBuys(id) {

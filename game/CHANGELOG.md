@@ -2,6 +2,13 @@
 
 All notable changes to Fish Friends.
 
+## [1.24.2] — 2026-07-06
+- **Patrol Shark upgrade buffed:** now +5% free-shark chance per level per
+  purchase, up to **50%** (was +2% up to 20%).
+- **Smarter level tips:** each level's pre-level description now reflects its
+  *newest* fish or mechanic (currents, coral, anemone…) instead of always
+  mentioning tri fish, and Level 50 describes the boss.
+
 ## [1.24.1] — 2026-07-06
 - **Redrawn seahorse trophy** — the Legacy Seahorse Trophy icon is now a proper
   filled seahorse silhouette (trumpet snout, crowned spiky head, dorsal fin,

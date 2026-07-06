@@ -360,15 +360,23 @@ export class UI {
       cw.appendChild(chip);
     }
     const demo = document.getElementById('pre-demo');
-    const specials = new Set(level.spawns.map((s) => s.kind).filter((k) => k !== 'normal'));
-    let hint = 'Touch, or touch and drag, on the beach to draw fish of the opposite color to make friends!';
-    if (specials.has('white')) hint = '⚪ White fish: hit twice with the SAME color.';
-    if (specials.has('black')) hint = '⚫ Black fish: hit with a color, then its opposite.';
-    if (specials.has('tri')) hint = '🌈 Tri fish: counter the FRONT band first, then back.';
-    // Hazard intro hints take priority on their first-appearance levels.
-    if (level.n === 30) hint = '🪸 A coral reef blocks a cell — fish can\'t pass it, and it drifts around.';
-    else if (level.n === 25) hint = '🌊 A water current sweeps fish sideways as they cross it — it flips every 15s.';
-    demo.textContent = hint;
+    demo.textContent = this._levelHint(n, level);
+  }
+
+  // Describe the newest fish/mechanic relevant to this level (highest-rank
+  // feature present), so later levels stop harping on tri fish and L50 is the boss.
+  _levelHint(n, level) {
+    if (level.kind === 'boss') {
+      return '🐋 BOSS — the Prism Whale! Hit it with the OPPOSITE of its colour (or a rainbow) to drive it back. Keep fish from leaking: if it reaches the beach or 20 fish slip past, you lose.';
+    }
+    const kinds = new Set((level.spawns || []).map((s) => s.kind));
+    if (level.anemone) return '🌸 Anemone: it repaints any fish that drifts through it — watch the colours change and re-read them!';
+    if (level.coral) return '🪸 Coral reef: blocks a cell so fish can\'t pass, and it drifts around the grid every few seconds.';
+    if (level.currents > 0) return '🌊 Water currents sweep fish one lane sideways as they cross — the flow flips direction every 15s.';
+    if (kinds.has('tri')) return '🔺 Tri fish: counter the FRONT band first, then work your way to the back.';
+    if (kinds.has('black')) return '⚫ Black fish: hit it with any colour, then finish it with THAT colour\'s opposite.';
+    if (kinds.has('white')) return '⚪ White fish: hit it twice with the SAME colour.';
+    return 'Touch, or touch and drag, on the beach to draw fish of the opposite colour to make friends!';
   }
 
   // ---- Game HUD ----------------------------------------------------------
