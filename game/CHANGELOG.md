@@ -2,6 +2,11 @@
 
 All notable changes to Fish Friends.
 
+## [1.31.2] — 2026-07-06
+- The Legacy congratulations screen and the "upgrades locked" note now name the
+  boss you actually beat / must beat — "🐢 The Ancient Sea Turtle swims free!"
+  on a turtle run instead of always saying the Prism Whale.
+
 ## [1.31.1] — 2026-07-06
 - **Sea Turtle phase 2:** his head now sticks out the front (narrow) end of his
   shell and spins around with it — attached like a real turtle — instead of just

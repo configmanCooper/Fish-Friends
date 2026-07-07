@@ -162,7 +162,7 @@ export class UI {
       <div class="screen" id="s-legacyintro">
         <div class="card wide legacy-intro-card">
           <div class="li-trophy">${shSVG(72)}</div>
-          <div class="card-level">The Prism Whale is at peace!</div>
+          <div class="card-level" id="li-title">The Prism Whale is at peace!</div>
           <div class="li-congrats">You've beaten the final boss and unlocked <strong>Legacy</strong>.</div>
           <div class="li-explain">
             <p>🐚 <strong>Legacy</strong> is where your journey lives on. Spend leftover
@@ -170,7 +170,7 @@ export class UI {
             <p>♻️ When you're ready, <strong>restart your journey</strong> to keep every upgrade,
                earn a <strong>Seahorse Trophy</strong> ${SH_SM}, and face tougher seas — one extra
                colour and hazards arriving sooner each time.</p>
-            <p>Your upgrades lock until you defeat the whale again — then you can buy more.</p>
+            <p id="li-relock">Your upgrades lock until you defeat the next boss — then you can buy more.</p>
           </div>
           <button class="btn btn-primary" data-action="legacy-intro-ok">Open Legacy 🐚</button>
         </div>
@@ -335,8 +335,12 @@ export class UI {
   }
 
   // ---- Legacy menu -------------------------------------------------------
-  renderLegacyIntro(saveData) {
-    document.getElementById('s-legacyintro'); // static content; nothing dynamic needed
+  renderLegacyIntro(saveData, bossType) {
+    // Match the boss you just beat (whale on your first-ever clear, turtle later).
+    const title = document.getElementById('li-title');
+    if (title) title.textContent = bossType === 'turtle'
+      ? '🐢 The Ancient Sea Turtle swims free!'
+      : '🐋 The Prism Whale is at peace!';
   }
 
   renderLegacy(saveData) {
@@ -345,8 +349,9 @@ export class UI {
     document.getElementById('legacy-seahorses').textContent = saveData.seahorses || 0;
     const locked = !saveData.bossDefeated;
     const note = document.getElementById('legacy-note');
+    const nextBoss = bossTypeFor(saveData.prestige || 0) === 'turtle' ? 'Ancient Sea Turtle' : 'Prism Whale';
     note.textContent = locked
-      ? 'Upgrades are locked until you defeat the Prism Whale again. Your permanent bonuses below still apply.'
+      ? `Upgrades are locked until you defeat the ${nextBoss}. Your permanent bonuses below still apply.`
       : 'Spend starfish on permanent upgrades — they persist through every restart.';
     const grid = document.getElementById('legacy-grid');
     grid.innerHTML = '';

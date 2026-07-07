@@ -246,7 +246,7 @@ class Game {
     // The very first boss victory shows a congratulations + Legacy explainer.
     if (firstEverClear) {
       this.state = 'legacyintro';
-      this.ui.renderLegacyIntro(this.save);
+      this.ui.renderLegacyIntro(this.save, res.bossType);
       this.ui.show('legacyintro');
       return;
     }
