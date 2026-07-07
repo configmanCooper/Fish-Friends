@@ -265,6 +265,7 @@ export const TURTLE = {
   hp: 100,                    // base; +20 per prestige-pair
   hpPerPrestige: 20,
   maxLeaks: 30,               // this many fish past you = you lose
+  maxWasted: 50,              // this many player fish sent off the top (no hit) = you lose
   hitRadius: 0.09,            // contact half-height for spots/head
   segCooldown: 0.5,           // seconds a spot/head is inert after a contact
   rimDepth: 0.13,             // how far the front-rim splotch arc dips toward the player
@@ -276,12 +277,14 @@ export const TURTLE = {
   // that rotate with it (switching lanes as they orbit the shell edge).
   p2: { headOut: 10, hits: 2, shellY: 0.7, headY: 0.54, spinPeriod: 15,
         spots: 14, ringRxFrac: 0.82, ringRy: 0.17 },
-  // Phase 3 (<=25% hp): fast spin, self-drain, sheds paint, two currents.
-  p3: { atFrac: 0.25, drainPct: 0.01, drainEvery: 3, spinPeriod: 7,
+  // Phase 3 (<=25% hp): fast spin, self-drain, sheds paint, two currents. He sits
+  // a little lower than phase 2 — just below the highest current he makes.
+  p3: { atFrac: 0.25, drainPct: 0.01, drainEvery: 3, spinPeriod: 7, shellY: 0.6,
         fishMult: 1.1, speedMult: 1.1, paintMin: 2, paintMax: 3, paintSpeed: 0.5,
-        currentLoRow: 1, currentHiRow: 4, leaveSpeed: 0.4 },
+        currentLoRow: 1, currentHiRow: 4,
+        settleDur: 2.2, emergeDur: 2.2, leaveSpeed: 0.3, leaveOffY: 1.42 },
   fishSpeedMult: 0.9,         // fight fish 10% slower (like the whale)
-  fish: { every: 3.2, rowMin: 1, rowMax: 3, whiteChance: 0.10, blackChance: 0.10, triChance: 0.04 },
+  fish: { every: 2.9, rowMin: 1, rowMax: 3, whiteChance: 0.10, blackChance: 0.10, triChance: 0.04 },
 };
 
 // ---------------------------------------------------------------------------

@@ -475,20 +475,25 @@ export class Render3D {
     if (head.visible) {
       head.material.color.setHex(COLORS[hEnemy.color] ? COLORS[hEnemy.color].hex : 0xffffff);
       head.rotation.z = 0;
+      head.scale.setScalar(1);
       head.position.set(this.worldX(hEnemy.lane) / span, (this.worldY(hEnemy.y) - this.worldY(shellY)) / span, 0.08);
     }
     if (t.leaving) {
-      head.visible = true; head.material.color.setHex(0x5aa832);
+      // finale: head slowly emerges from the (now head-up) shell and rises away
+      const e = t.headEmerge || 0;
+      head.visible = e > 0.02;
+      head.material.color.setHex(0x5aa832);
       head.rotation.z = Math.PI; // snout up as he swims away
-      head.position.set(0, 0.62, 0.08);
+      head.position.set(0, 0.28 + 0.5 * e, 0.08);
+      head.scale.setScalar(0.35 + 0.65 * e);
     }
 
-    // phase-3 paint projectiles
+    // phase-3 paint projectiles — always drawn above the shell
     const paint = t.paint || [];
     while (this.turtlePaintMeshes.length < paint.length) {
       const m = new THREE.Mesh(this.turtleSpotPlane, new THREE.MeshBasicMaterial({
         map: this.turtleSplatTex[this.turtlePaintMeshes.length % this.turtleSplatTex.length], transparent: true, depthWrite: false }));
-      m.renderOrder = 6; this.scene.add(m); this.turtlePaintMeshes.push(m);
+      m.renderOrder = 9; this.scene.add(m); this.turtlePaintMeshes.push(m);
     }
     for (let i = 0; i < this.turtlePaintMeshes.length; i++) {
       const m = this.turtlePaintMeshes[i];
@@ -496,7 +501,7 @@ export class Render3D {
       if (!pt) { m.visible = false; continue; }
       m.visible = true;
       m.material.color.setHex(COLORS[pt.color] ? COLORS[pt.color].hex : 0xffffff);
-      m.position.set(this.worldX(Math.max(0, Math.min(this.laneCount - 1, pt.x))), this.worldY(pt.y), 1.4);
+      m.position.set(this.worldX(Math.max(0, Math.min(this.laneCount - 1, pt.x))), this.worldY(pt.y), 2.0);
       m.rotation.z = this.time * 2 + i;
       const sc = 0.55 + 0.12 * Math.sin(this.time * 10 + i);
       m.scale.set(sc, sc, sc);

@@ -93,6 +93,7 @@ export class Sim {
     this.leaks = 0;
     this.kills = 0;
     this.wastedFish = 0;   // player fish that escaped the top without a hit (2 => -1)
+    this.turtleWasted = 0; // turtle fight: player fish sent off the top (lose at TURTLE.maxWasted)
     this.squidEats = 0;    // squid eats accumulator (2 eaten => +1)
 
     this._initHazards();
@@ -525,10 +526,11 @@ export class Sim {
       shellY: TURTLE.p1.shellY, headY: TURTLE.p1.headY,
       spinAngle: 0, spinPeriod: 0,
       drainT: 0, paintT: 0, paint: [],
-      leaving: false, leaveY: null,
+      leaving: false, leaveY: null, leaveStage: null, settleT: 0, emergeT: 0, headEmerge: 0,
       fishT: TURTLE.fish.every, fishMult: 1, speedBoost: 1,
       p3CurrentsAdded: false,
     };
+    this.turtleWasted = 0;   // player fish sent off the top without a hit (lose at maxWasted)
     this.spots = [];     // active hittable splotch enemies (boss-flagged)
     this._turtleSpawnP1Spots();
     this.emit('turtleSpawn', { hp });
@@ -661,7 +663,9 @@ export class Sim {
 
     // Phase 3: fast spin, self-drain to 1%, shed paint, two currents, then leave.
     t.spinPeriod = TURTLE.p3.spinPeriod;
-    t.spinAngle = (t.spinAngle + (dt / t.spinPeriod) * Math.PI * 2) % (Math.PI * 2);
+    if (!t.leaving) {
+      t.spinAngle = (t.spinAngle + (dt / t.spinPeriod) * Math.PI * 2) % (Math.PI * 2);
+    }
     if (!t.p3CurrentsAdded) {
       t.p3CurrentsAdded = true;
       t.fishMult = TURTLE.p3.fishMult; t.speedBoost = TURTLE.p3.speedMult;
@@ -679,28 +683,52 @@ export class Sim {
         this.score = t.maxHp - t.hp;
         this.emit('turtleDrain', { hp: t.hp });
       }
-      // shed paint splotches that recolour fish
+      // shed paint splotches that recolour fish (from his current position)
       t.paintT -= dt;
       if (t.paintT <= 0) {
         t.paintT += 1;
         const n = this.rng.int(TURTLE.p3.paintMin, TURTLE.p3.paintMax);
         for (let i = 0; i < n; i++) {
           const ang = this.rng.next() * Math.PI * 2;
-          t.paint.push({ x: this._turtleCenterLane(), y: TURTLE.p2.shellY,
+          t.paint.push({ x: this._turtleCenterLane(), y: t.shellY,
             vx: Math.cos(ang) * TURTLE.p3.paintSpeed, vy: Math.sin(ang) * TURTLE.p3.paintSpeed,
             color: this.rng.pick(this.level.pool), life: 4 });
         }
       }
       this._turtlePaintTick(dt);
       if (t.hp <= 0.01 * t.maxHp + 1e-6) {
-        t.leaving = true; t.leaveY = TURTLE.p2.shellY;
+        // begin the leaving sequence: settle spin -> emerge head -> swim off
+        t.leaving = true; t.leaveStage = 'settle';
+        t.settleT = 0; t.emergeT = 0; t.headEmerge = 0;
+        t.leaveY = t.shellY;
         this._clearSpots(); this._turtleHeadTuck(); t.paint.length = 0;
         this.emit('turtleLeaving', {});
       }
     } else {
-      // no new fish; swim up and off screen -> win when gone
+      this._turtleLeaveTick(dt);
+    }
+  }
+
+  // Phase-3 finale: he stops spinning with his head end pointing up, slowly pokes
+  // his head out, then slowly swims up and off the top of the screen -> win.
+  _turtleLeaveTick(dt) {
+    const t = this.turtle;
+    if (t.leaveStage === 'settle') {
+      // ease the spin to a stop with the head end (shell angle PI) facing up
+      t.settleT += dt;
+      let diff = Math.PI - t.spinAngle;
+      diff = Math.atan2(Math.sin(diff), Math.cos(diff)); // shortest way round
+      t.spinAngle += diff * Math.min(1, dt * 2.2);
+      if (t.settleT >= TURTLE.p3.settleDur) { t.spinAngle = Math.PI; t.leaveStage = 'emerge'; }
+    } else if (t.leaveStage === 'emerge') {
+      t.spinAngle = Math.PI;
+      t.emergeT += dt;
+      t.headEmerge = Math.min(1, t.emergeT / TURTLE.p3.emergeDur);
+      if (t.emergeT >= TURTLE.p3.emergeDur) { t.headEmerge = 1; t.leaveStage = 'swim'; }
+    } else {
+      t.spinAngle = Math.PI; t.headEmerge = 1;
       t.leaveY += TURTLE.p3.leaveSpeed * dt;
-      if (t.leaveY > 1.3) {
+      if (t.leaveY > (TURTLE.p3.leaveOffY || 1.4)) {
         this.bossWon = true;
         this.emit('turtleDefeated', {});
       }
@@ -768,10 +796,12 @@ export class Sim {
           }
         } else if (t.phase === 2) {
           if (t.headHitsLeft <= 0) {
-            // -> phase 3 (force hp to the 25% gate if head hits overshot)
+            // -> phase 3 (force hp to the 25% gate if head hits overshot); he
+            // drops a little lower, to just below the highest current he makes.
             t.hp = Math.min(t.hp, TURTLE.p3.atFrac * t.maxHp);
             this.score = t.maxHp - t.hp;
             t.phase = 3; t.drainT = 0; t.paintT = 0;
+            t.shellY = TURTLE.p3.shellY;
             this.emit('turtlePhase', { phase: 3 });
           } else {
             this._turtleSpawnP2Ring();
@@ -1201,9 +1231,11 @@ export class Sim {
       if (p.alive && p.y >= FIELD.topExitY) {
         p.alive = false;
         this.emit('playerExit', { lane: p.lane });
-        // Wasted fish: every 2 that escape the top without a hit cost 1 point.
-        // Not on the boss level, and never for Prism Dash rainbow fish (noWaste).
-        if (this.level.kind !== 'boss' && !p.noWaste) {
+        if (this.bossType === 'turtle') {
+          // Turtle fight: fish sent off the top without a hit pile up toward a loss.
+          if (!p.noWaste) { this.turtleWasted++; this.emit('turtleWaste', { lane: p.lane, wasted: this.turtleWasted }); }
+        } else if (this.level.kind !== 'boss' && !p.noWaste) {
+          // Wasted fish: every 2 that escape the top without a hit cost 1 point.
           this.wastedFish++;
           if (this.wastedFish >= 2) {
             this.wastedFish -= 2;
@@ -1227,14 +1259,16 @@ export class Sim {
     if (this.level.kind === 'boss') {
       if (this.bossType === 'turtle') {
         const swarmed = this.leaks >= TURTLE.maxLeaks;
-        if (this.bossWon || swarmed) {
+        const overwhelmed = this.turtleWasted >= (TURTLE.maxWasted || 50);
+        if (this.bossWon || swarmed || overwhelmed) {
           for (const s of this.enemies) if (s.boss) s.alive = false;
           this.enemies = this.enemies.filter((e) => e.alive);
           this.ended = true;
           this.emit('levelEnd', {
             score: this.score, maxScore: this.maxScore, stars: this.bossWon ? 3 : 0,
             passTarget: this.level.passTarget, passed: this.bossWon,
-            boss: true, bossWon: this.bossWon, loseReason: this.bossWon ? null : 'swarm',
+            boss: true, bossWon: this.bossWon,
+            loseReason: this.bossWon ? null : (swarmed ? 'swarm' : 'wasted'),
           });
         }
         return;

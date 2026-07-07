@@ -2,6 +2,23 @@
 
 All notable changes to Fish Friends.
 
+## [1.31.0] — 2026-07-06
+- **Sea Turtle phase-3 rework.**
+  - He now drops a little lower for the finale — sitting just below the highest
+    current he stirs up.
+  - The paint he flings now always draws **above** his shell.
+  - About **10% more fish** stream in through the whole fight.
+  - New loss: if **50** of your fish slip off the top of the screen without
+    touching a splotch or making a friend, you lose (shown in the boss bar as
+    ⬆️, alongside ⬇️ for fish reaching the beach). 50 gives plenty of room for
+    his spinning.
+  - **Finale animation:** at 1% he slowly stops spinning with his head-end
+    turned up, slowly pokes his head out, and slowly swims up and off the top —
+    you win the moment he's fully gone.
+
+## [1.30.0] — 2026-07-06
+- **God mode:** adjust your prestige level directly from the Legacy screen.
+
 ## [1.29.0] — 2026-07-06
 - **Sea Turtle polish.**
   - A soft "poof" sound and a coloured burst now play every time a fish clears a
