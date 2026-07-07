@@ -220,6 +220,11 @@ html, body {
 .legacy-seahorse { filter: drop-shadow(0 2px 3px rgba(0,0,0,.4)); animation: shBob 2.6s ease-in-out infinite; }
 .seahorse-count { font-weight:800; font-size:.9rem; color:#f2c088; }
 #legacy-powers-btn { padding:3px 8px; }
+.legacy-god { display:flex; gap:8px; justify-content:center; align-items:center; margin-bottom:8px; font-size:.85rem; }
+.legacy-god .lg-plabel { font-weight:800; opacity:.85; }
+.legacy-god .lg-pval { min-width:1.4rem; text-align:center; font-weight:800; font-variant-numeric:tabular-nums; }
+.legacy-god .btn { padding:2px 10px; font-weight:800; }
+.legacy-god .lg-pboss { opacity:.8; margin-left:4px; }
 .powers-grid { display:flex; flex-direction:column; gap:8px; margin:10px 0 12px; }
 .power-item { display:flex; align-items:center; gap:10px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:8px 10px; text-align:left; }
 .power-item.on { border-color:#37d0a0; box-shadow:0 0 10px rgba(55,208,160,.35); background:rgba(55,208,160,.10); }

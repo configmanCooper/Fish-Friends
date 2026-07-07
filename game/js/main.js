@@ -312,6 +312,16 @@ class Game {
     this.ui.renderLegacy(this.save);
   }
 
+  // God-mode only: set the prestige level directly (drives the L50 boss + the
+  // difficulty ramp). Rebuilds the live campaign for the chosen prestige.
+  setPrestige(p) {
+    if (!this.godMode) return;
+    this.save.prestige = Math.max(0, Math.round(p || 0));
+    Save.save(this.save);
+    this.campaign = levelDefsFor(this.save.prestige);
+    this.ui.renderLegacy(this.save);
+  }
+
   // Restart progress: keep permanent upgrades + seahorses, wipe run progress,
   // grant a seahorse trophy, and raise the prestige difficulty.
   confirmPrestige() {

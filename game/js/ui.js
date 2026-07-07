@@ -187,6 +187,7 @@ export class UI {
             <div class="chip star-chip big">${SF_BIG} <span id="legacy-starfish">0</span></div>
             <button class="btn btn-small" data-action="powers" id="legacy-powers-btn">⚡ Powers</button>
           </div>
+          <div class="legacy-god" id="legacy-god" style="display:none"></div>
           <div class="legacy-note" id="legacy-note"></div>
           <div class="legacy-grid" id="legacy-grid"></div>
           <button class="btn btn-danger" data-action="prestige-restart" id="legacy-restart">♻️ Restart Journey (+1 ${SH_SM})</button>
@@ -248,6 +249,8 @@ export class UI {
       case 'toggle-power': g.togglePower(el.dataset.power); break;
       case 'buy-legacy': g.buyLegacy(el.dataset.legacy); break;
       case 'prestige-restart': g.confirmPrestige(); break;
+      case 'prestige-inc': g.setPrestige((g.save.prestige || 0) + 1); break;
+      case 'prestige-dec': g.setPrestige((g.save.prestige || 0) - 1); break;
       case 'settings': g.openSettings(); break;
       case 'open-codes': g.openCodes(); break;
       case 'submit-code': g.submitCode(document.getElementById('code-input').value); break;
@@ -368,6 +371,23 @@ export class UI {
     // Powers button visible only if you own at least one seahorse.
     const powBtn = document.getElementById('legacy-powers-btn');
     if (powBtn) powBtn.style.display = (godMode || (saveData.seahorses || 0) > 0) ? '' : 'none';
+    // God-mode only: adjust the prestige level directly (drives boss + difficulty).
+    const godRow = document.getElementById('legacy-god');
+    if (godRow) {
+      if (godMode) {
+        godRow.style.display = '';
+        const p = saveData.prestige || 0;
+        const boss = bossTypeFor(p) === 'turtle' ? '🐢 Turtle' : '🐋 Whale';
+        godRow.innerHTML =
+          `<span class="lg-plabel">Prestige</span>` +
+          `<button class="btn btn-small" data-action="prestige-dec" ${p <= 0 ? 'disabled' : ''}>−</button>` +
+          `<span class="lg-pval" id="legacy-prestige-val">${p}</span>` +
+          `<button class="btn btn-small" data-action="prestige-inc">+</button>` +
+          `<span class="lg-pboss">L50: ${boss}</span>`;
+      } else {
+        godRow.style.display = 'none';
+      }
+    }
   }
 
   // ---- Seahorse Powers ---------------------------------------------------
