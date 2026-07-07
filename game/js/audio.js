@@ -59,6 +59,7 @@ export const sfx = {
   shark: () => { noise(0.4, 0.22); tone(120, 0.4, 'sawtooth', 0.12, 60); },
   squid: () => tone(180, 0.5, 'sine', 0.12, 120),
   deny: () => tone(200, 0.08, 'sine', 0.06, 160),
+  splat: () => { noise(0.08, 0.07); tone(540, 0.1, 'sine', 0.11, 300); },
 };
 
 // Background music: a looping mp3 track. Plays continuously across menu and

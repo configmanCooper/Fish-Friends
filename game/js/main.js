@@ -401,9 +401,9 @@ class Game {
 
   useItem(kind) {
     if (!this.isPlaying()) return;
-    if ((this.save.inventory[kind] || 0) <= 0) return;
-    // Per-level limits (normal levels only; The Deep is unrestricted).
-    if (!this.deep) {
+    if ((this.save.inventory[kind] || 0) <= 0 && !this.godMode) return;
+    // Per-level limits (normal levels only; The Deep and god mode are unrestricted).
+    if (!this.deep && !this.godMode) {
       if (kind === 'shark' && this.pendingShark) { this.pendingShark = false; this.ui.toast('Shark cancelled'); this._renderDock(); return; }
       if (this.itemsUsedThisLevel.has(kind)) { this.ui.toast(`${POWERUPS[kind].name} already used this level`); return; }
       if (this.itemUseCount >= 3) { this.ui.toast('Item limit reached (3 per level)'); return; }
@@ -443,7 +443,7 @@ class Game {
   }
 
   _markItemUsed(kind) {
-    if (this.deep) return;
+    if (this.deep || this.godMode) return;
     this.itemsUsedThisLevel.add(kind);
     this.itemUseCount++;
   }
@@ -452,6 +452,7 @@ class Game {
   }
 
   _consume(kind) {
+    if (this.godMode) return; // unlimited items in god mode
     this.save.inventory[kind] = Math.max(0, (this.save.inventory[kind] || 0) - 1);
     Save.save(this.save);
     this._renderDock();
@@ -557,6 +558,7 @@ class Game {
       else if (e.type === 'leak') Audio.sfx.leak();
       else if (e.type === 'weave') Audio.sfx.weave();
       else if (e.type === 'transform') Audio.sfx.transform();
+      else if (e.type === 'turtleSpotClear') Audio.sfx.splat();
     }
   }
 

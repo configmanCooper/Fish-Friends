@@ -503,14 +503,18 @@ export class Sim {
   // ======================= Ancient Sea Turtle boss =======================
   _turtleCenterLane() { return Math.floor(this.lanes / 2); }
 
-  // Splotches ride the shell's front rim: the centre lane dips toward the player
-  // (front tip of the shell) and the outer lanes rise to the sides, tracing the
-  // marginal-scute edge rather than a flat line across the middle.
-  _turtleRimY(lane, shellY) {
-    const c = (this.lanes - 1) / 2;
-    const u = c > 0 ? (lane - c) / c : 0;              // -1..1 across the lanes
+  // Phase-1 splotch position: N splotches spread along the shell's front rim,
+  // kept INSIDE the shell width (rimHalfFrac) and dipping toward the player in an
+  // arc. Outer splotches may round onto the same lane as their neighbour but sit
+  // further down that lane — that's fine and reads as paint clustered on the edge.
+  _turtleArcPos(i, N, shellY) {
+    const center = (this.lanes - 1) / 2;
+    const t = N > 1 ? (i - (N - 1) / 2) / ((N - 1) / 2) : 0; // -1..1 across the arc
+    const halfW = center * (TURTLE.rimHalfFrac != null ? TURTLE.rimHalfFrac : 0.72);
     const depth = TURTLE.rimDepth != null ? TURTLE.rimDepth : 0.13;
-    return shellY - depth * Math.sqrt(Math.max(0, 1 - u * u));
+    const px = center + t * halfW;
+    const y = shellY - depth * Math.sqrt(Math.max(0, 1 - t * t));
+    return { px, y, lane: Math.max(0, Math.min(this.lanes - 1, Math.round(px))) };
   }
 
   _initTurtle() {
@@ -520,8 +524,6 @@ export class Sim {
       headOut: false, headColor: null, headTimer: 0, headHitsLeft: TURTLE.p1.hits,
       shellY: TURTLE.p1.shellY, headY: TURTLE.p1.headY,
       spinAngle: 0, spinPeriod: 0,
-      spotsTotal: 0, spotsCleared: 0,      // phase 2 ring progress
-      refillT: 0,
       drainT: 0, paintT: 0, paint: [],
       leaving: false, leaveY: null,
       fishT: TURTLE.fish.every, fishMult: 1, speedBoost: 1,
@@ -532,9 +534,11 @@ export class Sim {
     this.emit('turtleSpawn', { hp });
   }
 
-  // Create a boss-flagged, hittable splotch enemy.
-  _makeSpot(lane, y, color) {
-    const s = { id: fid(), boss: true, turtleSpot: true, kind: 'boss', lane, y, color, alive: true, vulnerableAt: 0 };
+  // Create a boss-flagged, hittable splotch enemy. `px` is a fractional lane used
+  // for smooth rendering; `ang` is its base angle on the phase-2 rotating ring.
+  _makeSpot(lane, y, color, px, ang) {
+    const s = { id: fid(), boss: true, turtleSpot: true, kind: 'boss', lane, y, color, alive: true, vulnerableAt: 0,
+      px: px != null ? px : lane, ang: ang != null ? ang : null };
     this.enemies.push(s); this.spots.push(s);
     return s;
   }
@@ -554,23 +558,43 @@ export class Sim {
     return out;
   }
 
-  // Phase 1: one splotch per lane along the back row, each a different colour.
+  // Phase 1: splotches spread along the shell's front rim (head tucked).
   _turtleSpawnP1Spots() {
     this._clearSpots();
-    const colors = this._spotColors(this.lanes);
-    for (let l = 0; l < this.lanes; l++) this._makeSpot(l, this._turtleRimY(l, TURTLE.p1.shellY), colors[l]);
+    const N = this.lanes;
+    const colors = this._spotColors(N);
+    for (let i = 0; i < N; i++) {
+      const p = this._turtleArcPos(i, N, TURTLE.p1.shellY);
+      this._makeSpot(p.lane, p.y, colors[i], p.px, null);
+    }
   }
 
-  // Phase 2: show `frontArc` splotches across central lanes; they refill from a
-  // pool of 18 as the shell spins, until all 18 are cleared.
-  _turtleSpawnP2Front() {
+  // Phase 2: a full ring of splotches around the shell edge; they orbit with the
+  // spin (updated every tick), so they slide between lanes as the shell turns.
+  _turtleSpawnP2Ring() {
     this._clearSpots();
-    const arc = Math.min(TURTLE.p2.frontArc, this.lanes);
-    const start = Math.max(0, this._turtleCenterLane() - Math.floor(arc / 2));
-    const remaining = this.turtle.spotsTotal - this.turtle.spotsCleared;
-    const show = Math.min(arc, remaining);
-    const colors = this._spotColors(show);
-    for (let i = 0; i < show; i++) this._makeSpot(start + i, this._turtleRimY(start + i, TURTLE.p2.shellY), colors[i]);
+    const N = TURTLE.p2.spots;
+    const colors = this._spotColors(N);
+    for (let i = 0; i < N; i++) {
+      this._makeSpot(0, TURTLE.p2.shellY, colors[i], 0, (i / N) * Math.PI * 2);
+    }
+    this._turtleUpdateRing();
+  }
+
+  // Re-project every ring splotch from its base angle + the current spin onto a
+  // lane/row on the shell edge. Front of the ring dips toward the player.
+  _turtleUpdateRing() {
+    const t = this.turtle;
+    const center = (this.lanes - 1) / 2;
+    const rx = center * (TURTLE.p2.ringRxFrac != null ? TURTLE.p2.ringRxFrac : 0.82);
+    const ry = TURTLE.p2.ringRy != null ? TURTLE.p2.ringRy : 0.17;
+    for (const s of this.spots) {
+      if (s.ang == null) continue;
+      const a = s.ang + t.spinAngle;
+      s.px = center + rx * Math.sin(a);
+      s.y = t.shellY - ry * Math.cos(a); // a=0 -> front/low (toward player), a=π -> back/high
+      s.lane = Math.max(0, Math.min(this.lanes - 1, Math.round(s.px)));
+    }
   }
 
   _turtleHeadOut(dur) {
@@ -620,20 +644,17 @@ export class Sim {
     }
 
     if (t.phase === 2) {
-      // slow spin visual + ring refill
+      // slow spin; the ring of splotches rotates with the shell
       t.spinPeriod = TURTLE.p2.spinPeriod;
       t.spinAngle = (t.spinAngle + (dt / t.spinPeriod) * Math.PI * 2) % (Math.PI * 2);
       if (t.headOut) {
         t.headTimer -= dt;
-        if (t.headTimer <= 0) { this._turtleHeadTuck(); this.turtle.spotsCleared = 0; this._turtleSpawnP2Front(); }
+        if (t.headTimer <= 0) { this._turtleHeadTuck(); this._turtleSpawnP2Ring(); } // missed -> fresh ring
       } else if (this.spots.length === 0) {
-        // front arc all cleared; refill next batch after a short rotation beat
-        if (t.spotsCleared >= t.spotsTotal) {
-          this._turtleHeadOut(TURTLE.p2.headOut);
-        } else {
-          t.refillT -= dt;
-          if (t.refillT <= 0) { t.refillT = t.spinPeriod / TURTLE.p2.spots; this._turtleSpawnP2Front(); }
-        }
+        // whole ring cleared -> poke the painted head out
+        this._turtleHeadOut(TURTLE.p2.headOut);
+      } else {
+        this._turtleUpdateRing(); // orbit the splotches with the spin
       }
       return;
     }
@@ -729,8 +750,7 @@ export class Sim {
       if (seg.turtleSpot) {
         seg.alive = false;
         this.spots = this.spots.filter((s) => s !== seg);
-        if (t.phase === 2) t.spotsCleared++;
-        this.emit('turtleSpotClear', { lane: seg.lane, color: seg.color, phase: t.phase });
+        this.emit('turtleSpotClear', { lane: seg.lane, color: seg.color, phase: t.phase, y: seg.y });
       } else if (seg.turtleHead) {
         this._turtleHeadTuck();
         this._turtleDamage(headDamage);
@@ -741,9 +761,8 @@ export class Sim {
             // -> phase 2
             t.phase = 2; t.headHitsLeft = TURTLE.p2.hits;
             t.shellY = TURTLE.p2.shellY; t.headY = TURTLE.p2.headY;
-            t.spotsTotal = TURTLE.p2.spots; t.spotsCleared = 0; t.refillT = 0;
             this.emit('turtlePhase', { phase: 2 });
-            this._turtleSpawnP2Front();
+            this._turtleSpawnP2Ring();
           } else {
             this._turtleSpawnP1Spots();
           }
@@ -755,7 +774,7 @@ export class Sim {
             t.phase = 3; t.drainT = 0; t.paintT = 0;
             this.emit('turtlePhase', { phase: 3 });
           } else {
-            t.spotsCleared = 0; this._turtleSpawnP2Front();
+            this._turtleSpawnP2Ring();
           }
         }
       }
@@ -1279,7 +1298,7 @@ export class Sim {
         headLane: this._turtleCenterLane(), headY: this.turtle.headY,
         shellY: this.turtle.shellY, spinAngle: this.turtle.spinAngle,
         leaving: this.turtle.leaving, leaveY: this.turtle.leaveY,
-        spots: this.spots ? this.spots.map((s) => ({ lane: s.lane, y: s.y, color: s.color })) : [],
+        spots: this.spots ? this.spots.map((s) => ({ lane: s.lane, y: s.y, color: s.color, px: s.px })) : [],
         paint: this.turtle.paint.map((p) => ({ x: p.x, y: p.y, color: p.color })),
         leaks: this.leaks, maxLeaks: TURTLE.maxLeaks,
       } : null,

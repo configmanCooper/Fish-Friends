@@ -37,6 +37,20 @@ function actsOn(color, e) {
 export function perfectBot(sim) {
   if (!sim.isReady()) return;
   const covered = coveredEnemyIds(sim);
+  // On boss levels the perfect bot may launch RAINBOW fish (a universal counter),
+  // so fast-rotating boss splotches stay reliably clearable despite fish travel
+  // time. Normal levels stay picker-restricted so infeasible levels still fail.
+  if (sim.level && sim.level.kind === 'boss') {
+    const lanes = new Set();
+    for (const e of sim.enemies) {
+      if (!e.alive || covered.has(e.id)) continue;
+      if (e.y <= 0.14) continue;
+      if (sim.coral && e.lane === sim.coral.lane && e.coralStopped) continue;
+      lanes.add(e.lane);
+    }
+    if (lanes.size) sim.launch([...lanes], 'rainbow');
+    return;
+  }
   const picker = sim.level.picker;
   const pickerSet = new Set(picker);
   // a color safe to hit a phase-0 special with: its opposite is also selectable

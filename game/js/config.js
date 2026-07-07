@@ -268,11 +268,14 @@ export const TURTLE = {
   hitRadius: 0.09,            // contact half-height for spots/head
   segCooldown: 0.5,           // seconds a spot/head is inert after a contact
   rimDepth: 0.13,             // how far the front-rim splotch arc dips toward the player
+  rimHalfFrac: 0.72,          // phase-1 arc half-width as a fraction of the half lane-span (keeps splotches on the shell)
   headLane: null,             // centre lane (computed)
   // Phase 1: head tucked; shell fills the back row with one splotch per lane.
   p1: { headOut: 5, hits: 3, shellY: 0.86, headY: 0.72, damagePerHit: null },
-  // Phase 2: advances; head in middle; shell slowly spins an 18-spot ring.
-  p2: { headOut: 10, hits: 2, shellY: 0.7, headY: 0.54, spinPeriod: 15, spots: 18, frontArc: 6 },
+  // Phase 2: advances; head in middle; shell slowly spins a ring of splotches
+  // that rotate with it (switching lanes as they orbit the shell edge).
+  p2: { headOut: 10, hits: 2, shellY: 0.7, headY: 0.54, spinPeriod: 15,
+        spots: 14, ringRxFrac: 0.82, ringRy: 0.17 },
   // Phase 3 (<=25% hp): fast spin, self-drain, sheds paint, two currents.
   p3: { atFrac: 0.25, drainPct: 0.01, drainEvery: 3, spinPeriod: 7,
         fishMult: 1.1, speedMult: 1.1, paintMin: 2, paintMax: 3, paintSpeed: 0.5,

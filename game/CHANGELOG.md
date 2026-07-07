@@ -2,6 +2,19 @@
 
 All notable changes to Fish Friends.
 
+## [1.29.0] — 2026-07-06
+- **Sea Turtle polish.**
+  - A soft "poof" sound and a coloured burst now play every time a fish clears a
+    paint splotch, so hits read clearly.
+  - Phase-1 splotches are pulled inward so they all sit on the shell along its
+    front edge (the outermost ones may share a lane with a neighbour, just further
+    down — that's intentional).
+  - Phase 2 now shows a **full ring of splotches around the shell edge** that
+    **rotate with the shell**, sliding between lanes as it spins — many more to
+    clear than before.
+- **God mode: unlimited items.** With god mode on you can use the same item as
+  many times as you like in a level (no per-level cap and items don't run out).
+
 ## [1.28.0] — 2026-07-06
 - **Ambush Shark power reworked.**
   - Place a shark on the **beach** and it now rises normally — and because you

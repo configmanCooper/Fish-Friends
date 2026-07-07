@@ -461,7 +461,7 @@ export class Render3D {
       if (!s) { m.visible = false; continue; }
       m.visible = true;
       m.material.color.setHex(COLORS[s.color] ? COLORS[s.color].hex : 0xffffff);
-      const lx = this.worldX(s.lane) / span;
+      const lx = this.worldX(s.px != null ? s.px : s.lane) / span;
       const ly = (this.worldY(s.y) - this.worldY(shellY)) / span;
       m.position.set(lx, ly, 0.05);
       const sc = 0.185 + 0.03 * Math.sin(i * 2.1);
@@ -790,6 +790,11 @@ export class Render3D {
         this.fx.spawn(this.worldX(e.lane), wy, 0.5, 0xbfe8ff, { count: 5, speed: 0.5, size: 5 });
       } else if (e.type === 'bossDefeated') {
         for (let i = 0; i < 6; i++) this.fx.spawn(this.worldX(Math.floor(this.laneCount / 2)) + (Math.random() - 0.5) * 2, this.worldY(0.4), 0.8, 0xffe37a, { count: 22, speed: 1.4, life: 1.1 });
+      } else if (e.type === 'turtleSpotClear') {
+        const hex = e.color && COLORS[e.color] ? COLORS[e.color].hex : 0xffffff;
+        const y = e.y != null ? e.y : 0.82;
+        this.fx.spawn(this.worldX(e.lane), this.worldY(y), 0.7, hex, { count: 14, speed: 0.85, size: 6, life: 0.55 });
+        this.floaters.spawn(this.worldX(e.lane), this.worldY(y), 1, '✦');
       }
     }
   }
