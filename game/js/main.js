@@ -412,7 +412,9 @@ class Game {
       if (this.pendingShark) { this.pendingShark = false; this.ui.toast('Shark cancelled'); this._renderDock(); return; }
       this.pendingShark = true;
       this.sharkLane = Math.floor(this.level.lanes / 2) - 1;
-      this.ui.toast('Drag on the seabed to aim the shark');
+      this.ui.toast(this.sim.powers.ambush
+        ? 'Tap the ocean for an ambush sweep, or the beach for a rising pair'
+        : 'Drag on the seabed to aim the shark');
       return;
     }
     this._markItemUsed(kind);
@@ -427,9 +429,16 @@ class Game {
     this.pendingShark = false;
     this._markItemUsed('shark');
     this._consume('shark');
-    // Ambush Shark power: drop it into the ocean at the aimed row instead.
-    if (this.sim.powers.ambush) this.sim.useAmbushShark(this.sharkLane, this.sharkRowY);
-    else this.sim.useShark(this.sharkLane);
+    const ambush = this.sim.powers.ambush;
+    const onBeach = this.sharkRowY <= (POWERUPS.shark.ambushBeachY || 0.2);
+    if (ambush && !onBeach) {
+      // Ambush Shark: drop it into the ocean at the aimed row (edge-entry sweep).
+      this.sim.useAmbushShark(this.sharkLane, this.sharkRowY);
+    } else {
+      // Normal rising shark; with the Ambush power a beach shark gets a free partner.
+      this.sim.useShark(this.sharkLane);
+      if (ambush) this.sim.useShark(this.sim.partnerSharkLane(this.sharkLane));
+    }
     Audio.sfx.shark();
   }
 

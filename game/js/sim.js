@@ -819,16 +819,36 @@ export class Sim {
     this.emit('powerup', { kind: 'shark', lanes });
   }
 
-  // Ambush Shark power: a shark placed out in the ocean at (lane,row). It sweeps
-  // to the right edge, then reverses and sweeps to the left edge, then leaves —
-  // eating enemy fish it passes in that row.
-  useAmbushShark(startLane, rowY) {
-    const x = Math.max(0, Math.min(this.lanes - 1, startLane));
+  // Ambush Shark power: a shark dropped into the ocean at a row. It enters from
+  // the edge nearest the click (closer-to-right => far right sweeping left; closer
+  // -to-left or a dead-centre tie => far left... no: tie starts on the right),
+  // makes `ambushPasses` edge-to-edge sweeps, then swims off — eating enemy fish
+  // it passes in that row.
+  useAmbushShark(clickLane, rowY) {
+    const center = (this.lanes - 1) / 2;
+    const c = Math.max(0, Math.min(this.lanes - 1, Math.round(clickLane)));
+    let startX, dir;
+    if (c < center) { startX = 0; dir = 1; }            // closer to left -> enter far left, sweep right
+    else { startX = this.lanes - 1; dir = -1; }         // closer to right (ties included) -> enter far right, sweep left
     this.sharks.push({
       id: fid(), horizontal: true, rowY: rowY == null ? 0.5 : rowY,
-      x, dir: 1, phase: 0, born: this.time, lanes: [Math.round(x)],
+      x: startX, dir, passes: 0, maxPasses: POWERUPS.shark.ambushPasses || 4,
+      leaving: false, born: this.time, lanes: [Math.round(startX)],
     });
-    this.emit('powerup', { kind: 'ambushShark', lane: Math.round(x), rowY });
+    this.emit('powerup', { kind: 'ambushShark', lane: Math.round(startX), rowY });
+  }
+
+  // With the Ambush power, a shark placed on the beach is joined by a free
+  // partner two lanes over: to the right if the placed shark is on the left half,
+  // to the left if on the right half, and a coin-flip side if dead centre.
+  partnerSharkLane(lane) {
+    const center = (this.lanes - 1) / 2;
+    let side;
+    if (lane < center) side = 1;
+    else if (lane > center) side = -1;
+    else side = this.rng.chance(0.5) ? 1 : -1;
+    const off = POWERUPS.shark.partnerOffset || 2;
+    return Math.max(0, Math.min(this.lanes - 1, lane + side * off));
   }
 
   // interior lanes (all but leftmost & rightmost) for squid.
@@ -955,22 +975,34 @@ export class Sim {
   }
 
   updateSharks(dt) {
-    const HSPEED = 4.5; // ambush shark lane-units per second
+    const HSPEED = POWERUPS.shark.ambushHSpeed || 3.2; // ambush shark lane-units per second
     for (const sh of this.sharks) {
       if (sh.horizontal) {
         sh.x += sh.dir * HSPEED * dt;
-        if (sh.phase === 0 && sh.x >= this.lanes - 1) { sh.x = this.lanes - 1; sh.dir = -1; sh.phase = 1; }
-        else if (sh.phase === 1 && sh.x <= 0) { sh.x = 0; sh.phase = 2; sh.done = true; }
-        const lane = Math.round(sh.x);
+        if (!sh.leaving) {
+          const atRight = sh.x >= this.lanes - 1;
+          const atLeft = sh.x <= 0;
+          if ((sh.dir > 0 && atRight) || (sh.dir < 0 && atLeft)) {
+            sh.x = atRight ? this.lanes - 1 : 0;
+            sh.passes += 1;
+            if (sh.passes >= sh.maxPasses) sh.leaving = true; // swim off this edge
+            else sh.dir = -sh.dir;                            // bounce for another pass
+          }
+        } else if (sh.x < -1 || sh.x > this.lanes) {
+          sh.done = true;
+        }
+        const lane = Math.max(0, Math.min(this.lanes - 1, Math.round(sh.x)));
         sh.lanes = [lane];
-        for (const e of this.enemies) {
-          if (!e.alive || e.boss) continue;
-          if (e.lane !== lane) continue;
-          if (Math.abs(e.y - sh.rowY) > 0.12) continue;
-          const val = remainingValue(e);
-          this.addScore(e.minion ? 0 : val);
-          e.alive = false; this.kills++;
-          this.emit('sharkEat', { id: e.id, lane: e.lane, value: val });
+        if (!sh.leaving) {
+          for (const e of this.enemies) {
+            if (!e.alive || e.boss) continue;
+            if (e.lane !== lane) continue;
+            if (Math.abs(e.y - sh.rowY) > 0.12) continue;
+            const val = remainingValue(e);
+            this.addScore(e.minion ? 0 : val);
+            e.alive = false; this.kills++;
+            this.emit('sharkEat', { id: e.id, lane: e.lane, value: val });
+          }
         }
         continue;
       }

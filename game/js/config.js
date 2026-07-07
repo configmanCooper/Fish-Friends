@@ -135,7 +135,11 @@ export const INV_CAP = 4;
 
 export const POWERUPS = {
   ice:     { id: 'ice',     name: 'Ice Cube',   icon: '🧊', price: PRICES.ice,     duration: 15 },
-  shark:   { id: 'shark',   name: 'Shark',      icon: '🦈', price: PRICES.shark,   duration: 2.5, lanesWide: 3 },
+  shark:   { id: 'shark',   name: 'Shark',      icon: '🦈', price: PRICES.shark,   duration: 2.5, lanesWide: 3,
+             ambushHSpeed: 3.2,   // ocean sweep speed (lane-units/s) — slower than the old 4.5
+             ambushPasses: 4,     // full edge-to-edge sweeps before it swims off
+             ambushBeachY: 0.2,   // placing at/below this field-y counts as the beach (rising shark)
+             partnerOffset: 2 },  // free ambush partner spawns this many lanes over
   rainbow: { id: 'rainbow', name: 'Rainbow',    icon: '🌈', price: PRICES.rainbow, duration: 15 },
   squid:   { id: 'squid',   name: 'Giant Squid',icon: '🦑', price: PRICES.squid,   duration: 30 },
 };

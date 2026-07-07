@@ -377,6 +377,50 @@ function testCurrentNotSharkSquid() {
   eq(JSON.stringify(sim.sharks[0] ? sim.sharks[0].lanes : lanesBefore), JSON.stringify(lanesBefore), 'shark lanes unaffected by current');
 }
 
+function testAmbushShark() {
+  // Start side by click position (lanes 0..7, centre = 3.5).
+  const mk = () => new Sim(makeLevel([], { lanes: 8 }), { powers: ['ambush'] });
+  let s = mk(); s.useAmbushShark(1, 0.5);
+  eq(s.sharks[0].x, 0, 'ambush click on left half enters from far left');
+  eq(s.sharks[0].dir, 1, 'ambush from left sweeps right first');
+  s = mk(); s.useAmbushShark(6, 0.5);
+  eq(s.sharks[0].x, 7, 'ambush click on right half enters from far right');
+  eq(s.sharks[0].dir, -1, 'ambush from right sweeps left first');
+
+  // Odd-lane dead-centre tie starts on the right.
+  const sc = new Sim(makeLevel([], { lanes: 7 }), { powers: ['ambush'] });
+  sc.useAmbushShark(3, 0.5); // centre lane of 7 (centre index 3)
+  eq(sc.sharks[0].x, 6, 'centre-tie ambush starts on the right');
+
+  // Four passes then it swims off and is removed.
+  s = mk(); s.useAmbushShark(1, 0.5);
+  const sh = s.sharks[0];
+  let reversals = 0, prevDir = sh.dir, sawLeaving = false;
+  for (let i = 0; i < 60 * 40 && s.sharks.length; i++) {
+    s.updateSharks(1 / 60);
+    if (s.sharks[0]) {
+      if (s.sharks[0].dir !== prevDir) { reversals++; prevDir = s.sharks[0].dir; }
+      if (s.sharks[0].leaving) sawLeaving = true;
+    }
+  }
+  eq(reversals, 3, 'a 4-pass sweep reverses exactly 3 times');
+  ok(sawLeaving, 'ambush shark enters a leaving state');
+  eq(s.sharks.length, 0, 'ambush shark is removed after swimming off');
+
+  // Ambush shark eats a fish sitting in its row as it sweeps by.
+  const se = new Sim(makeLevel([], { lanes: 8 }), { powers: ['ambush'] });
+  se.enemies.push({ id: 1, lane: 5, y: 0.5, kind: 'normal', color: 'blue', value: 1, alive: true });
+  se.useAmbushShark(1, 0.5); // enters far left, sweeps right through lane 5
+  for (let i = 0; i < 60 * 10 && se.enemies[0].alive; i++) se.updateSharks(1 / 60);
+  ok(!se.enemies[0].alive, 'ambush shark eats a fish in its row');
+
+  // Beach partner: 2 over toward centre-away side, clamped in range.
+  const sp = new Sim(makeLevel([], { lanes: 8 }), { powers: ['ambush'] });
+  eq(sp.partnerSharkLane(1), 3, 'left-half beach shark gets a partner 2 to the right');
+  eq(sp.partnerSharkLane(6), 4, 'right-half beach shark gets a partner 2 to the left');
+  eq(sp.partnerSharkLane(0), 2, 'edge beach shark partner stays in range');
+}
+
 function testCoralBlocksEnemy() {
   const lvl = makeLevel([{ t: 999, lane: 0, kind: 'normal', color: 'blue', value: 1 }], { lanes: 5, coral: true });
   const sim = new Sim(lvl);
@@ -566,6 +610,7 @@ function main() {
   testCurrentPush();
   testCurrentFlips();
   testCurrentNotSharkSquid();
+  testAmbushShark();
   testCoralBlocksEnemy();
   testCoralRemovesPlayer();
   testCoralDisintegrates();

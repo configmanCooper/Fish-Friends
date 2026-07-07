@@ -2,6 +2,18 @@
 
 All notable changes to Fish Friends.
 
+## [1.28.0] — 2026-07-06
+- **Ambush Shark power reworked.**
+  - Place a shark on the **beach** and it now rises normally — and because you
+    have the Ambush power, a **second free shark** joins it two lanes over (to the
+    right if you placed on the left half, to the left if on the right half, and a
+    coin-flip side dead centre).
+  - Place a shark in the **ocean** and it enters from the edge nearest your tap —
+    far right if you tapped the right side, far left if you tapped the left (a
+    dead-centre tap starts on the right).
+  - The ocean sweep now makes **four full passes** across the row before swimming
+    off, and moves a bit **slower** while going horizontal.
+
 ## [1.27.0] — 2026-07-06
 - **Sea Turtle detail pass.** Rebuilt the turtle to actually look like a sea
   turtle: a brown, segmented (scute‑patterned) egg‑shaped shell with a marginal
