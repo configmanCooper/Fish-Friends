@@ -37,6 +37,176 @@ function triGeoMesh(tri, mat) {
   return new THREE.Mesh(g, mat);
 }
 
+// --- Sea-turtle canvas textures (flat top-down illustration style) -----------
+function _canvasTex(w, h, draw) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  draw(ctx, w, h);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  return tex;
+}
+
+// Obovoid "egg" outline: wide rounded top, tapering to a narrow rounded point at
+// the bottom (the head end, which faces the player in phase 1).
+function _eggPath(g, cx, cy, Wr, Hr) {
+  g.beginPath();
+  g.moveTo(cx, cy - Hr);
+  g.bezierCurveTo(cx + Wr * 1.26, cy - Hr * 0.92, cx + Wr, cy + Hr * 0.16, cx + Wr * 0.42, cy + Hr * 0.74);
+  g.bezierCurveTo(cx + Wr * 0.16, cy + Hr * 1.0, cx - Wr * 0.16, cy + Hr * 1.0, cx - Wr * 0.42, cy + Hr * 0.74);
+  g.bezierCurveTo(cx - Wr, cy + Hr * 0.16, cx - Wr * 1.26, cy - Hr * 0.92, cx, cy - Hr);
+  g.closePath();
+}
+
+function makeTurtleShellTexture() {
+  return _canvasTex(512, 620, (g, w, h) => {
+    const cx = w / 2, cy = h / 2, Wr = w * 0.43, Hr = h * 0.45;
+    _eggPath(g, cx, cy, Wr, Hr);
+    g.save(); g.clip();
+    const grd = g.createLinearGradient(cx - Wr, cy - Hr, cx + Wr, cy + Hr);
+    grd.addColorStop(0, '#956333'); grd.addColorStop(0.5, '#774a20'); grd.addColorStop(1, '#5c3814');
+    g.fillStyle = grd; g.fillRect(0, 0, w, h);
+    g.restore();
+
+    const iWr = Wr * 0.80, iHr = Hr * 0.82;
+    // marginal scutes: inner boundary + radial ticks
+    g.save(); _eggPath(g, cx, cy, Wr, Hr); g.clip();
+    g.strokeStyle = 'rgba(48,26,9,0.75)'; g.lineWidth = 5; g.lineCap = 'round';
+    _eggPath(g, cx, cy, iWr, iHr); g.stroke();
+    const N = 22;
+    for (let i = 0; i < N; i++) {
+      const a = (i / N) * Math.PI * 2;
+      const s = Math.sin(a), c = -Math.cos(a);
+      g.beginPath();
+      g.moveTo(cx + s * iWr, cy + c * iHr);
+      g.lineTo(cx + s * Wr * 1.05, cy + c * Hr * 1.05);
+      g.stroke();
+    }
+    g.restore();
+
+    // central scutes (vertebral column + costal sides)
+    g.save(); _eggPath(g, cx, cy, iWr, iHr); g.clip();
+    g.strokeStyle = 'rgba(48,26,9,0.72)'; g.lineWidth = 5; g.lineJoin = 'round';
+    const colX = Wr * 0.24;
+    g.beginPath(); g.moveTo(cx - colX, cy - Hr);
+    g.bezierCurveTo(cx - colX * 1.15, cy - Hr * 0.3, cx - colX * 0.85, cy + Hr * 0.4, cx - colX * 0.5, cy + Hr); g.stroke();
+    g.beginPath(); g.moveTo(cx + colX, cy - Hr);
+    g.bezierCurveTo(cx + colX * 1.15, cy - Hr * 0.3, cx + colX * 0.85, cy + Hr * 0.4, cx + colX * 0.5, cy + Hr); g.stroke();
+    for (let i = 1; i < 5; i++) {
+      const yy = cy - Hr * 0.72 + (Hr * 1.5) * (i / 5);
+      g.beginPath(); g.moveTo(cx - colX, yy); g.quadraticCurveTo(cx, yy - 9, cx + colX, yy); g.stroke();
+    }
+    for (let i = 1; i < 4; i++) {
+      const yy = cy - Hr * 0.62 + (Hr * 1.35) * (i / 4);
+      g.beginPath(); g.moveTo(cx - colX, yy); g.lineTo(cx - iWr, yy + (i - 1.5) * 10); g.stroke();
+      g.beginPath(); g.moveTo(cx + colX, yy); g.lineTo(cx + iWr, yy + (i - 1.5) * 10); g.stroke();
+    }
+    g.restore();
+
+    // glossy diagonal sheen
+    g.save(); _eggPath(g, cx, cy, Wr, Hr); g.clip();
+    g.globalAlpha = 0.13; g.fillStyle = '#ffe9c8';
+    g.beginPath(); g.ellipse(cx - Wr * 0.26, cy - Hr * 0.22, Wr * 0.52, Hr * 0.72, -0.5, 0, Math.PI * 2); g.fill();
+    g.globalAlpha = 1; g.restore();
+
+    // outline
+    g.strokeStyle = 'rgba(33,17,5,0.92)'; g.lineWidth = 8;
+    _eggPath(g, cx, cy, Wr, Hr); g.stroke();
+  });
+}
+
+function _drawFlipper(g, x, y, ang, len, wid) {
+  g.save(); g.translate(x, y); g.rotate(ang);
+  const grd = g.createLinearGradient(0, -wid, 0, wid);
+  grd.addColorStop(0, '#74b342'); grd.addColorStop(1, '#4c8827');
+  const paddle = () => {
+    g.beginPath();
+    g.moveTo(0, 0);
+    g.quadraticCurveTo(len * 0.5, -wid, len, -wid * 0.5);
+    g.quadraticCurveTo(len * 1.12, 0, len, wid * 0.5);
+    g.quadraticCurveTo(len * 0.5, wid, 0, 0);
+    g.closePath();
+  };
+  g.fillStyle = grd; paddle(); g.fill();
+  g.globalAlpha = 0.2; g.fillStyle = '#cdea9c';
+  g.beginPath(); g.moveTo(len * 0.14, -wid * 0.42); g.lineTo(len * 0.92, -wid * 0.18); g.lineTo(len * 0.42, wid * 0.18); g.closePath(); g.fill();
+  g.globalAlpha = 1;
+  g.strokeStyle = 'rgba(38,66,18,0.55)'; g.lineWidth = 3; paddle(); g.stroke();
+  g.restore();
+}
+
+// Body plate: four green flippers + tail, drawn head-down (head end toward the
+// bottom). The shell plate is drawn on top and hides the flipper roots.
+function makeTurtleBodyTexture() {
+  return _canvasTex(640, 760, (g, w, h) => {
+    const cx = w / 2, cy = h / 2;
+    // front flippers (large) flank the head end (lower sides), swept outward/down
+    _drawFlipper(g, cx - 150, cy + 96, 2.55, 300, 82);
+    _drawFlipper(g, cx + 150, cy + 96, Math.PI - 2.55, 300, 82);
+    // rear flippers (small) toward the tail (upper sides)
+    _drawFlipper(g, cx - 150, cy - 150, -2.35, 190, 58);
+    _drawFlipper(g, cx + 150, cy - 150, Math.PI + 2.35, 190, 58);
+    // tail (small point at the rear / top)
+    g.fillStyle = '#4c8827';
+    g.beginPath();
+    g.moveTo(cx, cy - 300); g.quadraticCurveTo(cx - 26, cy - 250, cx, cy - 218);
+    g.quadraticCurveTo(cx + 26, cy - 250, cx, cy - 300); g.closePath(); g.fill();
+  });
+}
+
+function makeTurtleHeadTexture() {
+  return _canvasTex(256, 340, (g, w, h) => {
+    const cx = w / 2, cy = h * 0.4, R = w * 0.33;
+    const outline = () => {
+      g.beginPath();
+      g.moveTo(cx - R, cy);
+      g.bezierCurveTo(cx - R, cy - R * 1.2, cx + R, cy - R * 1.2, cx + R, cy);
+      g.bezierCurveTo(cx + R, cy + R * 0.9, cx + R * 0.4, cy + R * 1.75, cx, cy + R * 1.85);
+      g.bezierCurveTo(cx - R * 0.4, cy + R * 1.75, cx - R, cy + R * 0.9, cx - R, cy);
+      g.closePath();
+    };
+    const grd = g.createRadialGradient(cx - R * 0.3, cy - R * 0.35, R * 0.2, cx, cy + R * 0.3, R * 1.6);
+    grd.addColorStop(0, '#ffffff'); grd.addColorStop(1, '#cccccc');
+    g.fillStyle = grd; outline(); g.fill();
+    g.fillStyle = '#181320';
+    g.beginPath(); g.arc(cx - R * 0.42, cy - R * 0.12, R * 0.15, 0, 7); g.fill();
+    g.beginPath(); g.arc(cx + R * 0.42, cy - R * 0.12, R * 0.15, 0, 7); g.fill();
+    g.fillStyle = 'rgba(40,30,20,0.45)';
+    g.beginPath(); g.arc(cx - R * 0.12, cy + R * 1.35, R * 0.055, 0, 7); g.fill();
+    g.beginPath(); g.arc(cx + R * 0.12, cy + R * 1.35, R * 0.055, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(55,45,35,0.5)'; g.lineWidth = 4; outline(); g.stroke();
+  });
+}
+
+// Irregular paint-splat mask (white on transparent) — tinted per splotch.
+function makeSplatTexture(seed) {
+  return _canvasTex(128, 128, (g, w) => {
+    const cx = w / 2, cy = w / 2, base = w * 0.27;
+    g.fillStyle = '#ffffff';
+    const steps = 40;
+    g.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const a = (i / steps) * Math.PI * 2;
+      const r = base * (0.74 + 0.34 * Math.sin(a * 3 + seed) + 0.16 * Math.sin(a * 5 - seed * 1.7));
+      const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+    }
+    g.closePath(); g.fill();
+    for (let i = 0; i < 5; i++) {
+      const a = seed * 1.3 + i * 1.7;
+      const d = w * (0.36 + 0.06 * ((i * 7 + seed * 3) % 3));
+      g.beginPath();
+      g.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, w * (0.035 + 0.03 * ((i + 1) % 2)), 0, 7);
+      g.fill();
+    }
+  });
+}
+
+
 export class Render3D {
   constructor(canvas) {
     this.canvas = canvas;
@@ -232,41 +402,32 @@ export class Render3D {
 
   _buildTurtle() {
     const g = new THREE.Group();
-    // Domed shell (top-down), spanning most of the width.
-    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.5, 24, 18),
-      new THREE.MeshLambertMaterial({ color: 0x2e6b45 }));
-    shell.scale.set(1.0, 0.72, 0.5);
+    this.turtleSplatTex = [makeSplatTexture(0.6), makeSplatTexture(1.9), makeSplatTexture(3.1), makeSplatTexture(4.4)];
+    this.turtleHeadTex = makeTurtleHeadTexture();
+    this.turtleSpotPlane = new THREE.PlaneGeometry(1, 1);
+
+    const mkPlane = (tex, wl, hl, ro, z) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(wl, hl),
+        new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+      m.renderOrder = ro; m.position.z = z;
+      return m;
+    };
+
+    // body plate (flippers + tail) — does not spin
+    const body = mkPlane(makeTurtleBodyTexture(), 1.62, 1.92, 2, 0.0);
+    g.add(body); this.turtleBody = body;
+    // shell plate — spins in phases 2/3
+    const shell = mkPlane(makeTurtleShellTexture(), 1.05, 1.28, 3, 0.02);
     g.add(shell); this.turtleShell = shell;
-    // Rim.
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.06, 10, 28),
-      new THREE.MeshLambertMaterial({ color: 0x214d31 }));
-    rim.rotation.x = Math.PI / 2; rim.scale.set(1.0, 1.0, 0.7);
-    g.add(rim);
-    // Four flippers.
-    this.turtleFlippers = [];
-    for (const [sx, sy] of [[-1, 0.5], [1, 0.5], [-1, -0.5], [1, -0.5]]) {
-      const f = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), new THREE.MeshLambertMaterial({ color: 0x2a7d52 }));
-      f.scale.set(0.32, 0.18, 0.1);
-      f.position.set(sx * 0.52, sy * 0.5, 0);
-      f.rotation.z = sx * 0.5;
-      g.add(f); this.turtleFlippers.push(f);
-    }
-    // Spot discs pool (colored splotches on the shell).
+    // colored paint splotches (created lazily on the front rim)
     this.turtleSpotMeshes = [];
-    this.turtleSpotGeo = new THREE.CircleGeometry(0.07, 16);
-    // Head (hidden until it pokes out).
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 14), new THREE.MeshLambertMaterial({ color: 0x2a7d52 }));
-    head.scale.set(0.5, 0.62, 0.45); head.visible = false;
-    g.add(head); this.turtleHeadMesh = head;
-    for (const s of [-1, 1]) {
-      const e = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), new THREE.MeshBasicMaterial({ color: 0x101820 }));
-      e.scale.setScalar(0.06); e.position.set(s * 0.18, 0.28, 0.3); head.add(e);
-    }
-    // Paint splat pool (phase 3 projectiles).
+    // head — hidden until it pokes out; snout points down (toward the player)
+    const head = mkPlane(this.turtleHeadTex, 0.34, 0.44, 5, 0.06);
+    head.visible = false; g.add(head); this.turtleHeadMesh = head;
+    // phase-3 paint projectiles (live in world space, added to scene)
     this.turtlePaintMeshes = [];
-    this.turtlePaintGeo = new THREE.CircleGeometry(0.1, 10);
-    g.visible = false;
-    g.renderOrder = 3;
+
+    g.visible = false; g.renderOrder = 3;
     this.turtleGroup = g;
     this.scene.add(g);
   }
@@ -276,20 +437,23 @@ export class Render3D {
     const t = (sim && !sim.ended && !sim.bossWon) ? sim.turtle : null;
     if (!t) { if (g.visible) g.visible = false; return; }
     g.visible = true;
-    const laneW = this._laneW();
     const cx = 0;
     const shellY = t.leaving ? t.leaveY : t.shellY;
     g.position.set(cx, this.worldY(shellY), 0.4);
-    const span = this.laneCount * laneW * 0.92;
+    const span = this.laneCount * this._laneW() * 0.92;
     g.scale.setScalar(span);
-    // spin (relative to shell size, so scale spots with the group)
+    // only the shell plate spins; the body/flippers hold station
     this.turtleShell.rotation.z = t.spinAngle || 0;
+    this.turtleBody.rotation.z = Math.sin(this.time * 1.1) * 0.015; // faint idle sway
 
-    // spots (live hittable splotches are stored on sim.spots, not sim.turtle)
+    // paint splotches — ride the shell's front rim (sim.spots owns lane + rim y)
     const spots = (sim.spots || []).filter((s) => s && s.alive !== false);
     while (this.turtleSpotMeshes.length < spots.length) {
-      const m = new THREE.Mesh(this.turtleSpotGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }));
-      m.renderOrder = 4; this.turtleGroup.add(m); this.turtleSpotMeshes.push(m);
+      const idx = this.turtleSpotMeshes.length;
+      const m = new THREE.Mesh(this.turtleSpotPlane, new THREE.MeshBasicMaterial({
+        map: this.turtleSplatTex[idx % this.turtleSplatTex.length], transparent: true, depthWrite: false }));
+      m.renderOrder = 4; m.rotation.z = (idx * 1.7) % (Math.PI * 2);
+      this.turtleGroup.add(m); this.turtleSpotMeshes.push(m);
     }
     for (let i = 0; i < this.turtleSpotMeshes.length; i++) {
       const m = this.turtleSpotMeshes[i];
@@ -297,11 +461,11 @@ export class Render3D {
       if (!s) { m.visible = false; continue; }
       m.visible = true;
       m.material.color.setHex(COLORS[s.color] ? COLORS[s.color].hex : 0xffffff);
-      // place relative to group centre using lane offset and row delta from shellY
-      const lx = (this.worldX(s.lane) - cx) / span;
+      const lx = this.worldX(s.lane) / span;
       const ly = (this.worldY(s.y) - this.worldY(shellY)) / span;
-      m.position.set(lx, ly, 0.55);
-      m.scale.setScalar(1 / 1); // already in group space
+      m.position.set(lx, ly, 0.05);
+      const sc = 0.185 + 0.03 * Math.sin(i * 2.1);
+      m.scale.set(sc, sc, sc);
     }
 
     // head (the hittable head lives on sim.turtleHead when it's out)
@@ -309,18 +473,22 @@ export class Render3D {
     const hEnemy = sim.turtleHead;
     head.visible = !!t.headOut && !!hEnemy && !t.leaving;
     if (head.visible) {
-      head.material.color.setHex(COLORS[hEnemy.color] ? COLORS[hEnemy.color].hex : 0x2a7d52);
-      const lx = (this.worldX(hEnemy.lane) - cx) / span;
-      const ly = (this.worldY(hEnemy.y) - this.worldY(shellY)) / span;
-      head.position.set(lx, ly, 0.6);
+      head.material.color.setHex(COLORS[hEnemy.color] ? COLORS[hEnemy.color].hex : 0xffffff);
+      head.rotation.z = 0;
+      head.position.set(this.worldX(hEnemy.lane) / span, (this.worldY(hEnemy.y) - this.worldY(shellY)) / span, 0.08);
     }
-    if (t.leaving) { head.visible = true; head.material.color.setHex(0x2a7d52); head.position.set(0, 0.6, 0.6); }
+    if (t.leaving) {
+      head.visible = true; head.material.color.setHex(0x5aa832);
+      head.rotation.z = Math.PI; // snout up as he swims away
+      head.position.set(0, 0.62, 0.08);
+    }
 
-    // paint splats
+    // phase-3 paint projectiles
     const paint = t.paint || [];
     while (this.turtlePaintMeshes.length < paint.length) {
-      const m = new THREE.Mesh(this.turtlePaintGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }));
-      m.renderOrder = 5; this.scene.add(m); this.turtlePaintMeshes.push(m);
+      const m = new THREE.Mesh(this.turtleSpotPlane, new THREE.MeshBasicMaterial({
+        map: this.turtleSplatTex[this.turtlePaintMeshes.length % this.turtleSplatTex.length], transparent: true, depthWrite: false }));
+      m.renderOrder = 6; this.scene.add(m); this.turtlePaintMeshes.push(m);
     }
     for (let i = 0; i < this.turtlePaintMeshes.length; i++) {
       const m = this.turtlePaintMeshes[i];
@@ -329,7 +497,9 @@ export class Render3D {
       m.visible = true;
       m.material.color.setHex(COLORS[pt.color] ? COLORS[pt.color].hex : 0xffffff);
       m.position.set(this.worldX(Math.max(0, Math.min(this.laneCount - 1, pt.x))), this.worldY(pt.y), 1.4);
-      m.scale.setScalar(0.5 + 0.2 * Math.sin(this.time * 10 + i));
+      m.rotation.z = this.time * 2 + i;
+      const sc = 0.55 + 0.12 * Math.sin(this.time * 10 + i);
+      m.scale.set(sc, sc, sc);
     }
   }
 

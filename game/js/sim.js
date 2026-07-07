@@ -503,6 +503,16 @@ export class Sim {
   // ======================= Ancient Sea Turtle boss =======================
   _turtleCenterLane() { return Math.floor(this.lanes / 2); }
 
+  // Splotches ride the shell's front rim: the centre lane dips toward the player
+  // (front tip of the shell) and the outer lanes rise to the sides, tracing the
+  // marginal-scute edge rather than a flat line across the middle.
+  _turtleRimY(lane, shellY) {
+    const c = (this.lanes - 1) / 2;
+    const u = c > 0 ? (lane - c) / c : 0;              // -1..1 across the lanes
+    const depth = TURTLE.rimDepth != null ? TURTLE.rimDepth : 0.13;
+    return shellY - depth * Math.sqrt(Math.max(0, 1 - u * u));
+  }
+
   _initTurtle() {
     const hp = this.level.bossHp || TURTLE.hp;
     this.turtle = {
@@ -548,7 +558,7 @@ export class Sim {
   _turtleSpawnP1Spots() {
     this._clearSpots();
     const colors = this._spotColors(this.lanes);
-    for (let l = 0; l < this.lanes; l++) this._makeSpot(l, TURTLE.p1.shellY, colors[l]);
+    for (let l = 0; l < this.lanes; l++) this._makeSpot(l, this._turtleRimY(l, TURTLE.p1.shellY), colors[l]);
   }
 
   // Phase 2: show `frontArc` splotches across central lanes; they refill from a
@@ -560,7 +570,7 @@ export class Sim {
     const remaining = this.turtle.spotsTotal - this.turtle.spotsCleared;
     const show = Math.min(arc, remaining);
     const colors = this._spotColors(show);
-    for (let i = 0; i < show; i++) this._makeSpot(start + i, TURTLE.p2.shellY, colors[i]);
+    for (let i = 0; i < show; i++) this._makeSpot(start + i, this._turtleRimY(start + i, TURTLE.p2.shellY), colors[i]);
   }
 
   _turtleHeadOut(dur) {

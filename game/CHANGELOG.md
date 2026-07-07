@@ -2,6 +2,18 @@
 
 All notable changes to Fish Friends.
 
+## [1.27.0] — 2026-07-06
+- **Sea Turtle detail pass.** Rebuilt the turtle to actually look like a sea
+  turtle: a brown, segmented (scute‑patterned) egg‑shaped shell with a marginal
+  edge ring, green front/rear flippers and a tail, all drawn top‑down and facing
+  **down** with the head tucked away in phase 1. The head now reads as a real
+  turtle head — rounded with a snout, eyes and nostrils — when it pokes out.
+- **Paint splotches moved to the shell's edge.** The colour splotches now ride
+  the shell's front **rim** in an arc (centre dips toward you, sides curve up)
+  instead of a flat line across the middle, and they're drawn as irregular paint
+  **splatters** rather than clean circles. Their hit positions follow the same
+  arc, so what you see is exactly what you hit.
+
 ## [1.26.2] — 2026-07-06
 - **Fixed the Sea Turtle boss render.** The colour splotches never appeared on his
   shell (the renderer read the spot list from the wrong place, so zero splotch
