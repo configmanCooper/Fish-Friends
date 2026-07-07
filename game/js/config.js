@@ -276,7 +276,7 @@ export const TURTLE = {
   // Phase 2: advances; head in middle; shell slowly spins a ring of splotches
   // that rotate with it (switching lanes as they orbit the shell edge).
   p2: { headOut: 10, hits: 2, shellY: 0.7, headY: 0.54, spinPeriod: 15,
-        spots: 14, ringRxFrac: 0.82, ringRy: 0.17 },
+        spots: 14, ringRxFrac: 0.82, ringRy: 0.17, headRxFrac: 0.98, headRy: 0.24 },
   // Phase 3 (<=25% hp): fast spin, self-drain, sheds paint, two currents. He sits
   // a little lower than phase 2 — just below the highest current he makes.
   p3: { atFrac: 0.25, drainPct: 0.01, drainEvery: 3, spinPeriod: 7, shellY: 0.6,

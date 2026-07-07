@@ -607,9 +607,26 @@ export class Sim {
     // add a hittable head enemy at the centre lane
     this._clearSpots();
     this.turtleHead = { id: fid(), boss: true, turtleHead: true, kind: 'boss',
-      lane: this._turtleCenterLane(), y: t.headY, color: t.headColor, alive: true, vulnerableAt: 0 };
+      lane: this._turtleCenterLane(), y: t.headY, color: t.headColor, alive: true, vulnerableAt: 0,
+      px: this._turtleCenterLane() };
     this.enemies.push(this.turtleHead);
+    if (t.phase === 2) this._turtleUpdateHead(); // ride the shell's front (narrow) end
     this.emit('turtleHeadOut', { color: t.headColor, phase: t.phase });
+  }
+
+  // Phase 2: the head sticks out the shell's front (narrow) end and orbits with
+  // the spin, as if it's really attached to the shell.
+  _turtleUpdateHead() {
+    const h = this.turtleHead;
+    const t = this.turtle;
+    if (!h || !t || t.phase !== 2) return;
+    const center = (this.lanes - 1) / 2;
+    const rx = center * (TURTLE.p2.headRxFrac != null ? TURTLE.p2.headRxFrac : 0.98);
+    const ry = TURTLE.p2.headRy != null ? TURTLE.p2.headRy : 0.24;
+    const a = t.spinAngle; // the shell's narrow (head) end aligns with ring angle 0
+    h.px = center + rx * Math.sin(a);
+    h.y = t.shellY - ry * Math.cos(a);
+    h.lane = Math.max(0, Math.min(this.lanes - 1, Math.round(h.px)));
   }
   _turtleHeadTuck() {
     const t = this.turtle;
@@ -651,6 +668,7 @@ export class Sim {
       t.spinAngle = (t.spinAngle + (dt / t.spinPeriod) * Math.PI * 2) % (Math.PI * 2);
       if (t.headOut) {
         t.headTimer -= dt;
+        this._turtleUpdateHead(); // head rides the shell's front end as it spins
         if (t.headTimer <= 0) { this._turtleHeadTuck(); this._turtleSpawnP2Ring(); } // missed -> fresh ring
       } else if (this.spots.length === 0) {
         // whole ring cleared -> poke the painted head out

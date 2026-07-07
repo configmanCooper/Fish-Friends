@@ -474,9 +474,11 @@ export class Render3D {
     head.visible = !!t.headOut && !!hEnemy && !t.leaving;
     if (head.visible) {
       head.material.color.setHex(COLORS[hEnemy.color] ? COLORS[hEnemy.color].hex : 0xffffff);
-      head.rotation.z = 0;
+      // in phase 2 the head is attached to the shell's front end and spins with it
+      head.rotation.z = (t.phase === 2) ? (t.spinAngle || 0) : 0;
       head.scale.setScalar(1);
-      head.position.set(this.worldX(hEnemy.lane) / span, (this.worldY(hEnemy.y) - this.worldY(shellY)) / span, 0.08);
+      const hx = hEnemy.px != null ? hEnemy.px : hEnemy.lane;
+      head.position.set(this.worldX(hx) / span, (this.worldY(hEnemy.y) - this.worldY(shellY)) / span, 0.08);
     }
     if (t.leaving) {
       // finale: head slowly emerges from the (now head-up) shell and rises away

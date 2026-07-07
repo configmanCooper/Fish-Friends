@@ -2,6 +2,11 @@
 
 All notable changes to Fish Friends.
 
+## [1.31.1] — 2026-07-06
+- **Sea Turtle phase 2:** his head now sticks out the front (narrow) end of his
+  shell and spins around with it — attached like a real turtle — instead of just
+  popping up in the middle. Hit it with its opposite as it sweeps past.
+
 ## [1.31.0] — 2026-07-06
 - **Sea Turtle phase-3 rework.**
   - He now drops a little lower for the finale — sitting just below the highest
