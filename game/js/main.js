@@ -57,6 +57,7 @@ class Game {
     window.addEventListener('pointerdown', () => { Audio.unlock(); Audio.playMusic('map'); }, { once: true });
     window.addEventListener('keydown', (e) => this._cheatKey(e));
     this._setupInstallPrompt();
+    this._setupBackTrap();
 
     requestAnimationFrame((t) => this._loop(t));
   }
@@ -88,6 +89,47 @@ class Game {
     try { await this._installEvent.userChoice; } catch (_) {}
     this._installEvent = null;
     if (btn) btn.style.display = 'none';
+  }
+
+  // ---- Back-gesture trap -------------------------------------------------
+  // On Android an edge swipe (or the system Back) navigates web history — even
+  // inside an installed PWA — which would otherwise yank players out of the game.
+  // We push a sentinel history entry and re-arm it on every popstate, so Back
+  // never leaves the app; instead it runs a sensible in-app action (pause in a
+  // level, step up one screen elsewhere). iOS standalone PWAs have no back
+  // gesture, so this is a no-op there.
+  _setupBackTrap() {
+    try {
+      history.pushState({ ff: true }, '');
+      window.addEventListener('popstate', () => {
+        history.pushState({ ff: true }, ''); // re-arm for the next Back
+        this.handleBack();
+      });
+    } catch (_) { /* History API unavailable */ }
+  }
+
+  handleBack() {
+    // A help pop-up closes first.
+    const help = document.getElementById('help-overlay');
+    if (help && help.classList.contains('active')) { this.ui.hideHelp(); return; }
+    // In a level (including The Deep), Back pauses instead of leaving.
+    const screen = this._currentScreen();
+    if (screen === 'game') { if (!this.paused) this.pause(); return; }
+    // Otherwise step up one screen — never exit the app on Back.
+    switch (screen) {
+      case 'codes': this.openSettings(); break;
+      case 'powers': this.openLegacy(); break;
+      case 'legacyintro': this.dismissLegacyIntro(); break;
+      case 'map': this.goToTitle(); break;
+      case 'title': break;             // top level — stay put
+      default: this.goToMap(); break;  // prelevel, results, shop, settings, legacy
+    }
+  }
+
+  // The screen currently shown (from the DOM, since a few openers don't set state).
+  _currentScreen() {
+    const el = document.querySelector('#ui-root .screen.active');
+    return el ? el.id.replace(/^s-/, '') : this.state;
   }
 
   // Detect the "f1shyfr1ends" cheat sequence anywhere -> toggle god mode.

@@ -2,6 +2,12 @@
 
 All notable changes to Fish Friends.
 
+## [1.32.1] — 2026-07-08
+- **Back-swipe no longer exits the game.** An Android edge-swipe / system Back
+  used to navigate away — even in the installed app (the previous version's CSS
+  couldn't stop the OS gesture). Back is now trapped: in a level it pauses, on
+  other screens it steps up one screen, and it never drops you out of the app.
+
 ## [1.32.0] — 2026-07-08
 - **Powerup countdown timers.** Using the Ice, Rainbow (or Squid) powerup now
   shows a circular badge in the upper right — the icon in a ring that drains as
