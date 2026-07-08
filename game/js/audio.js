@@ -80,3 +80,22 @@ export function stopMusic() {
   if (musicEl) { try { musicEl.pause(); } catch (e) {} }
 }
 
+// Pause the music while the app is backgrounded (browsers keep <audio> playing
+// otherwise), and resume it when the app returns — but only if we're the ones
+// who paused it and music is still enabled.
+let _bgPausedMusic = false;
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (musicEl && !musicEl.paused) { try { musicEl.pause(); } catch (e) {} _bgPausedMusic = true; }
+    } else if (_bgPausedMusic) {
+      _bgPausedMusic = false;
+      if (musicOn) playMusic();
+    }
+  });
+  // iOS/Safari can freeze a backgrounded page and fire pagehide instead.
+  window.addEventListener('pagehide', () => {
+    if (musicEl && !musicEl.paused) { try { musicEl.pause(); } catch (e) {} _bgPausedMusic = true; }
+  });
+}
+

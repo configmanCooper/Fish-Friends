@@ -2,6 +2,11 @@
 
 All notable changes to Fish Friends.
 
+## [1.32.2] — 2026-07-08
+- **Music stops when the app is in the background.** The soundtrack now pauses
+  when you switch away from Fish Friends (or lock the screen) and resumes when
+  you come back, instead of playing on in the background.
+
 ## [1.32.1] — 2026-07-08
 - **Back-swipe no longer exits the game.** An Android edge-swipe / system Back
   used to navigate away — even in the installed app (the previous version's CSS
