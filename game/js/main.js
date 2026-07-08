@@ -554,6 +554,7 @@ class Game {
         this.ui.updateHUD(this.sim.time, this.sim.score, this.level.passTarget, this.sim.cooldownProgress(), this.pendingShark, this.level.duration);
         this.ui.updateBossHud(null);
       }
+      this.ui.updateEffectTimers(this.sim.effects, this.sim.time);
     }
     this.debug.frame(dt, this.render, inGame ? this.sim : null);
   }

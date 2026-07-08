@@ -21,6 +21,7 @@ html, body {
   background: var(--c-bg); color: var(--c-ink);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   user-select: none; -webkit-user-select: none; touch-action: none;
+  overscroll-behavior: none; -webkit-overflow-scrolling: auto;
 }
 #game-canvas {
   position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: var(--z-canvas);
@@ -100,6 +101,19 @@ html, body {
 .hud-score { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .hud-score.gold { color: var(--c-accent); }
 
+/* Active-powerup countdown badges (upper right): a depleting ring + secs. */
+#powerup-timers { position: absolute; top: calc(env(safe-area-inset-top) + 50px); right: 10px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; z-index: 7; }
+.pu-timer { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.pu-ring { width: 44px; height: 44px; border-radius: 50%; position: relative;
+  display: flex; align-items: center; justify-content: center;
+  background: conic-gradient(var(--pu-col) var(--pct, 100%), rgba(255,255,255,0.16) 0);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.45); }
+.pu-ring::before { content: ''; position: absolute; inset: 4px; border-radius: 50%; background: var(--c-panel); }
+.pu-icon { position: relative; z-index: 1; font-size: 20px; line-height: 1; }
+.pu-secs { font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px #000; }
+.pu-ice { --pu-col: #7fd4ff; } .pu-rainbow { --pu-col: #ff8ad8; } .pu-squid { --pu-col: #b98cff; }
+
 #picker { position: absolute; bottom: calc(16% + env(safe-area-inset-bottom)); left: var(--s-3);
   display: flex; gap: var(--s-2); flex-wrap: wrap; max-width: 60%; pointer-events: auto; }
 .swatch.pick { width: var(--hit); height: var(--hit); cursor: pointer; box-shadow: 0 3px 8px rgba(0,0,0,0.4); }
@@ -156,6 +170,15 @@ html, body {
 .set-row { display: flex; justify-content: space-between; align-items: center; width: 100%;
   padding: var(--s-2) 0; font-size: 16px; }
 .set-row input { width: 24px; height: 24px; }
+.set-right { display: flex; align-items: center; gap: 10px; }
+.help-btn { width: 26px; height: 26px; border-radius: 50%; flex: 0 0 auto;
+  background: var(--c-panel-2); color: var(--c-ink); border: 1px solid rgba(255,255,255,0.25);
+  font-size: 15px; font-weight: 800; line-height: 1; cursor: pointer; padding: 0; }
+.help-card { position: relative; max-width: 340px; }
+.help-card .help-close { position: absolute; top: 8px; right: 10px; width: 30px; height: 30px;
+  border-radius: 50%; background: transparent; border: none; color: var(--c-ink-dim);
+  font-size: 18px; cursor: pointer; }
+.help-body { font-size: 15px; line-height: 1.4; color: var(--c-ink); margin: 6px 0 14px; text-align: center; }
 
 /* codes screen */
 .code-input { width: 100%; max-width: 260px; margin: var(--s-2) 0; padding: 12px 14px;

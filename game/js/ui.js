@@ -101,6 +101,7 @@ export class UI {
           <div class="boss-name" id="boss-name">🐋 Prism Whale</div>
           <div class="boss-hpbar"><div class="boss-hpfill" id="boss-hpfill"></div></div>
         </div>
+        <div id="powerup-timers"></div>
         <div id="powerup-dock"></div>
         <div id="picker"></div>
         <div id="cooldown-strip"><div id="cooldown-fill"></div></div>
@@ -141,7 +142,8 @@ export class UI {
           <label class="set-row"><span>Left-handed layout</span><input type="checkbox" data-setting="mirror"></label>
           <label class="set-row"><span>Sound effects</span><input type="checkbox" data-setting="sfx"></label>
           <label class="set-row"><span>Music</span><input type="checkbox" data-setting="music"></label>
-          <label class="set-row"><span>Auto-deploy shark near bottom</span><input type="checkbox" data-setting="autoShark"></label>
+          <label class="set-row"><span>Auto-deploy shark near bottom</span>
+            <span class="set-right"><button class="help-btn" data-action="help-autoshark" type="button" aria-label="What is this?">?</button><input type="checkbox" data-setting="autoShark"></span></label>
           <button class="btn btn-danger" data-action="wipe-data">🗑️ Delete All Data</button>
           <button class="btn btn-primary" data-action="back-map">Done</button>
           <button class="btn btn-small" data-action="open-codes">Codes</button>
@@ -216,6 +218,14 @@ export class UI {
       </div>
 
       <div class="overlay" id="countdown-overlay"><div id="countdown-num"></div></div>
+      <div class="overlay" id="help-overlay">
+        <div class="card help-card">
+          <button class="help-close" data-action="close-help" aria-label="Close">✕</button>
+          <div class="card-level" id="help-title">Help</div>
+          <div class="help-body" id="help-body"></div>
+          <button class="btn btn-primary" data-action="close-help">Got it</button>
+        </div>
+      </div>
       <div id="toast"></div>
     `;
   }
@@ -269,7 +279,23 @@ export class UI {
       case 'restart': g.replayLevel(); break;
       case 'use-item': g.useItem(el.dataset.item); break;
       case 'select-color': g.selectColor(el.dataset.color); break;
+      case 'help-autoshark': this.showHelp('🦈 Auto-deploy Shark',
+        'When a fish gets close to the beach, a shark is automatically used at that spot to catch it — so a stray fish never slips past.'); break;
+      case 'close-help': this.hideHelp(); break;
     }
+  }
+
+  showHelp(title, body) {
+    const t = document.getElementById('help-title');
+    const b = document.getElementById('help-body');
+    if (t) t.textContent = title;
+    if (b) b.textContent = body;
+    const ov = document.getElementById('help-overlay');
+    if (ov) ov.classList.add('active');
+  }
+  hideHelp() {
+    const ov = document.getElementById('help-overlay');
+    if (ov) ov.classList.remove('active');
   }
 
   show(screen) {
@@ -527,6 +553,35 @@ export class UI {
       fill.style.display = 'none';
     }
     document.getElementById('cooldown-strip').classList.toggle('shark-mode', !!pendingShark);
+  }
+
+  // Circular countdown badges (upper right) for active timed powerups: the ring
+  // depletes as the effect runs out, with the icon and remaining seconds.
+  updateEffectTimers(effects, time) {
+    const box = document.getElementById('powerup-timers');
+    if (!box) return;
+    if (!this._puEls) {
+      this._puEls = {};
+      for (const id of ['ice', 'rainbow', 'squid']) {
+        const el = document.createElement('div');
+        el.className = 'pu-timer pu-' + id;
+        el.innerHTML = `<div class="pu-ring"><span class="pu-icon">${POWERUPS[id].icon}</span></div><div class="pu-secs"></div>`;
+        el.style.display = 'none';
+        box.appendChild(el);
+        this._puEls[id] = { root: el, ring: el.querySelector('.pu-ring'), secs: el.querySelector('.pu-secs') };
+      }
+    }
+    for (const id of ['ice', 'rainbow', 'squid']) {
+      const e = effects && effects[id];
+      const els = this._puEls[id];
+      if (!e || !e.active) { if (els.root.style.display !== 'none') els.root.style.display = 'none'; continue; }
+      const dur = POWERUPS[id].duration || 1;
+      const remain = Math.max(0, e.until - time);
+      const pct = Math.max(0, Math.min(1, remain / dur));
+      if (els.root.style.display === 'none') els.root.style.display = '';
+      els.ring.style.setProperty('--pct', (pct * 100).toFixed(1) + '%');
+      els.secs.textContent = Math.max(0, Math.ceil(remain)) + 's';
+    }
   }
 
   toast(msg) {

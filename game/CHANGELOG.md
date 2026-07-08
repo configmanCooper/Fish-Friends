@@ -2,6 +2,18 @@
 
 All notable changes to Fish Friends.
 
+## [1.32.0] — 2026-07-08
+- **Powerup countdown timers.** Using the Ice, Rainbow (or Squid) powerup now
+  shows a circular badge in the upper right — the icon in a ring that drains as
+  the effect runs out, with the seconds remaining underneath.
+- **Fewer accidental "backs".** Added `overscroll-behavior: none` so an edge
+  swipe on Android no longer navigates back. (On iPhone Safari the edge-swipe is
+  a system gesture that a web page can't fully block — installing Fish Friends as
+  an app, which runs fullscreen, removes it entirely.)
+- **Auto-deploy shark help.** A "?" button next to the Auto-deploy Shark setting
+  opens a short pop-up (with an ✕) explaining it: when a fish gets close to the
+  beach, a shark is automatically used there to catch it.
+
 ## [1.31.2] — 2026-07-06
 - The Legacy congratulations screen and the "upgrades locked" note now name the
   boss you actually beat / must beat — "🐢 The Ancient Sea Turtle swims free!"
