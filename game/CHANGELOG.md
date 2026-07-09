@@ -2,6 +2,12 @@
 
 All notable changes to Fish Friends.
 
+## [1.33.1] — 2026-07-09
+- **Boss-clear bonus.** After beating a boss, a celebration menu now rewards
+  clean runs: **+6 starfish** and a "Fantastic Achievement!" if you spent **no**
+  Oyster Tokens this run, or **+3 starfish** and a "Well Done!" if you spent
+  **fewer than 15**. (Lean on 15+ tokens and there's no bonus.)
+
 ## [1.33.0] — 2026-07-09
 - **New "Stuck?" catch-up system with Oyster Tokens 🦪.** Fail a level and a
   **Stuck?** button appears. It opens a menu that explains the deal: reset your

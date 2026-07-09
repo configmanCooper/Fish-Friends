@@ -121,6 +121,7 @@ class Game {
       case 'codes': this.openSettings(); break;
       case 'powers': this.openLegacy(); break;
       case 'legacyintro': this.dismissLegacyIntro(); break;
+      case 'bossbonus': this.dismissBossBonus(); break;
       case 'stuck': this.state = 'results'; this.ui.show('results'); break;
       case 'map': this.goToTitle(); break;
       case 'title': break;             // top level — stay put
@@ -298,6 +299,24 @@ class Game {
     res.legacyUnlocked = !!this.save.bossDefeated;
     res.bossType = this.level.bossType || null;
     if (res.stars >= 1) Audio.sfx.star();
+    // Beating the boss with few/no Oyster Token boosts earns a bonus. Show that
+    // celebration menu first, then continue to the normal Legacy/results flow.
+    const bonus = this._bossBonus(res);
+    if (bonus) {
+      this.save.starfish += bonus.starfish;
+      Save.save(this.save);
+      this._pendingResult = { res, firstEverClear };
+      this.state = 'bossbonus';
+      this.ui.renderBossBonus(bonus);
+      this.ui.show('bossbonus');
+      Audio.sfx.star && Audio.sfx.star();
+      return;
+    }
+    this._continueAfterBoss(res, firstEverClear);
+  }
+
+  // Continue from a boss win to the Legacy explainer (first time) or results.
+  _continueAfterBoss(res, firstEverClear) {
     // The very first boss victory shows a congratulations + Legacy explainer.
     if (firstEverClear) {
       this.state = 'legacyintro';
@@ -308,6 +327,24 @@ class Game {
     this.state = 'results';
     this.ui.renderResults(res);
     this.ui.show('results');
+  }
+
+  // Reward for beating a boss without leaning hard on Oyster Tokens: +6 starfish
+  // if you spent none this run, +3 if you spent fewer than 15, nothing at 15+.
+  _bossBonus(res) {
+    if (!res.boss || !res.bossWon) return null;
+    const oy = this.save.oyster || {};
+    const used = (oy.starfish || 0) + (oy.friendSlow || 0) + (oy.fishSpeed || 0)
+      + (oy.specialFreq || 0) + (oy.allFreq || 0);
+    if (used === 0) return { starfish: 6, tier: 'none', used };
+    if (used < 15) return { starfish: 3, tier: 'few', used };
+    return null;
+  }
+
+  dismissBossBonus() {
+    const p = this._pendingResult; this._pendingResult = null;
+    if (!p) { this.goToMap(); return; }
+    this._continueAfterBoss(p.res, p.firstEverClear);
   }
 
   // Dismiss the first-clear Legacy explainer -> straight into the Legacy menu.

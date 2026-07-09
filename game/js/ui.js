@@ -6,7 +6,7 @@ import { POWERUPS, INV_CAP, LEVEL, DEEP, COOLDOWN_ENABLED,
   OYSTER_BOOSTS, OYSTER_BOOST_IDS, oysterMaxBuys, oysterValue, OYSTER_LEVELS_PER_TOKEN } from './config.js';
 import { LEVELS } from './levels.js';
 
-const SCREENS = ['title', 'map', 'prelevel', 'game', 'results', 'shop', 'settings', 'codes', 'legacy', 'legacyintro', 'powers', 'stuck', 'oyster'];
+const SCREENS = ['title', 'map', 'prelevel', 'game', 'results', 'shop', 'settings', 'codes', 'legacy', 'legacyintro', 'powers', 'stuck', 'oyster', 'bossbonus'];
 
 // Starfish icon (inline SVG) — the game's currency & level rating.
 // Chunky rounded 5-armed sea-star (fat quadratic-bezier arms) with bump spots.
@@ -258,6 +258,16 @@ export class UI {
         </div>
       </div>
 
+      <div class="screen" id="s-bossbonus">
+        <div class="card bonus-card">
+          <div class="bonus-burst" id="bonus-burst">🎉</div>
+          <div class="card-level" id="bonus-title">Fantastic!</div>
+          <div class="bonus-body" id="bonus-body"></div>
+          <div class="bonus-reward" id="bonus-reward"></div>
+          <button class="btn btn-primary" data-action="bossbonus-continue">Continue ▶</button>
+        </div>
+      </div>
+
       <div class="overlay" id="pause-overlay">
         <div class="card">
           <div class="card-level">Paused</div>
@@ -338,6 +348,7 @@ export class UI {
       case 'oyster-reset': g.confirmOysterReset(); break;
       case 'buy-oyster': g.buyOyster(el.dataset.oyster); break;
       case 'oyster-done': g.goToMap(); break;
+      case 'bossbonus-continue': g.dismissBossBonus(); break;
     }
   }
 
@@ -750,6 +761,18 @@ export class UI {
         + `<button class="btn btn-small" data-action="buy-oyster" data-oyster="${id}" ${canBuy ? '' : 'disabled'}>${atCap ? 'MAX' : `1 ${OY_SM}`}</button>`;
       grid.appendChild(row);
     }
+  }
+
+  // Post-boss bonus celebration for beating a boss with few/no Oyster Token boosts.
+  renderBossBonus(bonus) {
+    const title = document.getElementById('bonus-title');
+    const body = document.getElementById('bonus-body');
+    const reward = document.getElementById('bonus-reward');
+    if (title) title.textContent = bonus.tier === 'none' ? '🏆 Fantastic Achievement!' : '🎉 Well Done!';
+    if (body) body.innerHTML = bonus.tier === 'none'
+      ? `You beat the boss <strong>without spending a single Oyster Token</strong> — a truly fantastic achievement!`
+      : `You beat the boss using only <strong>${bonus.used}</strong> Oyster Token${bonus.used === 1 ? '' : 's'} — nicely done!`;
+    if (reward) reward.innerHTML = `<span class="bonus-plus">+${bonus.starfish}</span> ${SF_BIG} bonus starfish!`;
   }
 
   // ---- Shop --------------------------------------------------------------

@@ -192,6 +192,13 @@ html, body {
 .oyster-top { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-bottom: 4px; }
 .oyster-count { font-weight: 800; font-size: 1rem; color: #e2ccff; }
 
+/* Post-boss bonus celebration */
+.bonus-card { text-align: center; }
+.bonus-burst { font-size: 46px; line-height: 1; margin-bottom: 4px; animation: pulse 1.4s infinite; }
+.bonus-body { font-size: 15px; line-height: 1.45; color: var(--c-ink); margin: 6px 0 12px; }
+.bonus-reward { font-size: 20px; font-weight: 800; color: var(--c-accent); margin-bottom: 14px; }
+.bonus-reward .bonus-plus { font-size: 26px; }
+
 /* codes screen */
 .code-input { width: 100%; max-width: 260px; margin: var(--s-2) 0; padding: 12px 14px;
   font-size: 18px; text-align: center; border-radius: var(--r-2); border: 1px solid rgba(255,255,255,0.25);
