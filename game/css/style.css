@@ -180,6 +180,18 @@ html, body {
   font-size: 18px; cursor: pointer; }
 .help-body { font-size: 15px; line-height: 1.4; color: var(--c-ink); margin: 6px 0 14px; text-align: center; }
 
+/* Oyster Tokens ("Stuck?") */
+.btn-stuck { border-color: rgba(196,122,224,0.5); color: #e8d5ff; }
+.oy-hero { filter: drop-shadow(0 2px 4px rgba(0,0,0,0.45)); margin-bottom: 2px; }
+.stuck-body { font-size: 14px; line-height: 1.45; color: var(--c-ink); margin: 4px 0 10px; text-align: center; }
+.stuck-boosts { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; text-align: left; }
+.oyb-mini { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; line-height: 1.35;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10); border-radius: 10px; padding: 6px 9px; }
+.oyb-ic { font-size: 18px; line-height: 1; flex: 0 0 auto; }
+.oyb-tx { color: var(--c-ink-dim); } .oyb-tx strong { color: var(--c-ink); }
+.oyster-top { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-bottom: 4px; }
+.oyster-count { font-weight: 800; font-size: 1rem; color: #e2ccff; }
+
 /* codes screen */
 .code-input { width: 100%; max-width: 260px; margin: var(--s-2) 0; padding: 12px 14px;
   font-size: 18px; text-align: center; border-radius: var(--r-2); border: 1px solid rgba(255,255,255,0.25);

@@ -2,10 +2,11 @@
 import { COLORS } from './config.js';
 import { POWERUPS, INV_CAP, LEVEL, DEEP, COOLDOWN_ENABLED,
   LEGACY_UPGRADES, legacyMaxBuys, legacyValue, BOSS_LEVEL,
-  SEAHORSE_POWERS, SEAHORSE_POWER_IDS, bossTypeFor, TURTLE } from './config.js';
+  SEAHORSE_POWERS, SEAHORSE_POWER_IDS, bossTypeFor, TURTLE,
+  OYSTER_BOOSTS, OYSTER_BOOST_IDS, oysterMaxBuys, oysterValue, OYSTER_LEVELS_PER_TOKEN } from './config.js';
 import { LEVELS } from './levels.js';
 
-const SCREENS = ['title', 'map', 'prelevel', 'game', 'results', 'shop', 'settings', 'codes', 'legacy', 'legacyintro', 'powers'];
+const SCREENS = ['title', 'map', 'prelevel', 'game', 'results', 'shop', 'settings', 'codes', 'legacy', 'legacyintro', 'powers', 'stuck', 'oyster'];
 
 // Starfish icon (inline SVG) — the game's currency & level rating.
 // Chunky rounded 5-armed sea-star (fat quadratic-bezier arms) with bump spots.
@@ -45,6 +46,31 @@ function shSVG(size, filled = true) {
     + `${eye}</svg>`;
 }
 const SH = shSVG(16), SH_BIG = shSVG(22), SH_SM = shSVG(13);
+
+// Oyster Token icon (inline SVG) — an open ridged shell cradling a pearl. Unique
+// gradient ids per call so multiple tokens on one screen render correctly.
+let _oyN = 0;
+function oySVG(size) {
+  const id = 'oy' + (_oyN++);
+  return `<svg class="oy" viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align:middle;margin:0 1px">`
+    + `<defs>`
+    + `<radialGradient id="${id}p" cx="40%" cy="34%" r="68%">`
+    + `<stop offset="0%" stop-color="#ffffff"/><stop offset="55%" stop-color="#f3e7ff"/><stop offset="100%" stop-color="#c9b4e2"/></radialGradient>`
+    + `<linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1">`
+    + `<stop offset="0%" stop-color="#a6b9c4"/><stop offset="100%" stop-color="#6d8592"/></linearGradient>`
+    + `</defs>`
+    // lower shell (fan cup)
+    + `<path d="M2.4 12 Q12 24.2 21.6 12 Q19 15.4 12 15.4 Q5 15.4 2.4 12 Z" fill="url(#${id}s)" stroke="#465b66" stroke-width="0.8" stroke-linejoin="round"/>`
+    + `<g stroke="#546c78" stroke-width="0.6" fill="none" opacity="0.85">`
+    + `<path d="M12 15.2 L12 22"/><path d="M9 15 L7.4 21"/><path d="M15 15 L16.6 21"/><path d="M6 14.3 L4 18.8"/><path d="M18 14.3 L20 18.8"/></g>`
+    // upper shell (open lid)
+    + `<path d="M3 11.4 Q12 2.8 21 11.4 Q12 8.4 3 11.4 Z" fill="url(#${id}s)" stroke="#465b66" stroke-width="0.8" stroke-linejoin="round"/>`
+    // pearl
+    + `<circle cx="12" cy="12" r="3.7" fill="url(#${id}p)" stroke="#b19bce" stroke-width="0.5"/>`
+    + `<circle cx="10.7" cy="10.8" r="1.0" fill="#ffffff" opacity="0.85"/>`
+    + `</svg>`;
+}
+const OY_BIG = oySVG(40), OY_SM = oySVG(15);
 
 export class UI {
   constructor(root, game) {
@@ -121,6 +147,7 @@ export class UI {
             <button class="btn" data-action="replay">Replay</button>
             <button class="btn" data-action="shop">Shop 🛒</button>
             <button class="btn" data-action="back-map">Map</button>
+            <button class="btn btn-stuck" data-action="stuck" id="res-stuck" style="display:none">Stuck? ${OY_SM}</button>
           </div>
         </div>
       </div>
@@ -207,6 +234,30 @@ export class UI {
         </div>
       </div>
 
+      <div class="screen" id="s-stuck">
+        <div class="card wide">
+          <div class="oy-hero">${OY_BIG}</div>
+          <div class="card-level">Stuck?</div>
+          <div class="stuck-body" id="stuck-body"></div>
+          <div class="stuck-boosts" id="stuck-boosts"></div>
+          <button class="btn btn-primary" data-action="oyster-reset" id="stuck-reset">Reset &amp; Earn Tokens</button>
+          <button class="btn" data-action="stuck-back">Never mind</button>
+        </div>
+      </div>
+
+      <div class="screen" id="s-oyster">
+        <div class="card wide">
+          <div class="oyster-top">
+            <div class="oy-hero">${OY_BIG}</div>
+            <div class="oyster-count"><span id="oyster-tokens">0</span> Tokens</div>
+          </div>
+          <div class="card-level">Spend Oyster Tokens</div>
+          <div class="legacy-note">Each boost costs 1 token and lasts until you reset again. Choose wisely!</div>
+          <div class="legacy-grid" id="oyster-grid"></div>
+          <button class="btn btn-primary" data-action="oyster-done">Done — to the Map</button>
+        </div>
+      </div>
+
       <div class="overlay" id="pause-overlay">
         <div class="card">
           <div class="card-level">Paused</div>
@@ -282,6 +333,11 @@ export class UI {
       case 'help-autoshark': this.showHelp('🦈 Auto-deploy Shark',
         'When a fish gets close to the beach, a shark is automatically used at that spot to catch it — so a stray fish never slips past.'); break;
       case 'close-help': this.hideHelp(); break;
+      case 'stuck': g.openStuck(); break;
+      case 'stuck-back': g.state = 'results'; this.show('results'); break;
+      case 'oyster-reset': g.confirmOysterReset(); break;
+      case 'buy-oyster': g.buyOyster(el.dataset.oyster); break;
+      case 'oyster-done': g.goToMap(); break;
     }
   }
 
@@ -638,6 +694,61 @@ export class UI {
       legBtn.style.display = '';
     } else if (legBtn) {
       legBtn.style.display = 'none';
+    }
+    // "Stuck?" offer appears only when you didn't pass the level.
+    const stuckBtn = document.getElementById('res-stuck');
+    if (stuckBtn) stuckBtn.style.display = res.passed ? 'none' : '';
+  }
+
+  // ---- Oyster Tokens ("Stuck?") ------------------------------------------
+  renderStuck(saveData, tokens) {
+    const body = document.getElementById('stuck-body');
+    if (body) body.innerHTML =
+      `Having a hard time? You can <strong>reset your progress</strong> to earn <strong>Oyster Tokens</strong> ${OY_SM} — `
+      + `one for every ${OYSTER_LEVELS_PER_TOKEN} levels you've reached. Right now that's <strong>${tokens}</strong> token${tokens === 1 ? '' : 's'}.`
+      + `<br><br>Resetting wipes your level progress, starfish and items — but then you can spend those tokens on boosts that last until your next reset:`;
+    const grid = document.getElementById('stuck-boosts');
+    if (grid) {
+      grid.innerHTML = '';
+      for (const id of OYSTER_BOOST_IDS) {
+        const b = OYSTER_BOOSTS[id];
+        const row = document.createElement('div');
+        row.className = 'oyb-mini';
+        row.innerHTML = `<span class="oyb-ic">${b.icon}</span><span class="oyb-tx"><strong>${b.name}</strong> — ${b.desc}</span>`;
+        grid.appendChild(row);
+      }
+    }
+    const btn = document.getElementById('stuck-reset');
+    if (btn) {
+      btn.textContent = `Reset & Earn ${tokens} Token${tokens === 1 ? '' : 's'}`;
+      btn.disabled = tokens <= 0;
+    }
+  }
+
+  renderOyster(saveData) {
+    const tokens = saveData.oysterTokens || 0;
+    const tk = document.getElementById('oyster-tokens');
+    if (tk) tk.textContent = tokens;
+    const grid = document.getElementById('oyster-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    for (const id of OYSTER_BOOST_IDS) {
+      const b = OYSTER_BOOSTS[id];
+      const buys = (saveData.oyster && saveData.oyster[id]) || 0;
+      const maxBuys = oysterMaxBuys(id);
+      const atCap = buys >= maxBuys;
+      const val = oysterValue(id, buys);
+      const cur = b.kind === 'pct' ? `${Math.round(val * 100)}%` : `+${val}`;
+      const canBuy = !atCap && tokens > 0;
+      const row = document.createElement('div');
+      row.className = 'legacy-item' + (atCap ? ' maxed' : '');
+      row.innerHTML =
+        `<div class="li-icon">${b.icon}</div>`
+        + `<div class="li-body"><div class="li-name">${b.name} <span class="li-cur">(${cur}${atCap ? ' • MAX' : ''})</span></div>`
+        + `<div class="li-desc">${b.desc}</div>`
+        + `<div class="li-pips">${'●'.repeat(buys)}${'○'.repeat(Math.max(0, maxBuys - buys))}</div></div>`
+        + `<button class="btn btn-small" data-action="buy-oyster" data-oyster="${id}" ${canBuy ? '' : 'disabled'}>${atCap ? 'MAX' : `1 ${OY_SM}`}</button>`;
+      grid.appendChild(row);
     }
   }
 

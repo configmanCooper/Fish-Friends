@@ -1,10 +1,14 @@
 // save.js — versioned localStorage save with a migration table.
 const KEY = 'fishfriends.save';
-const CURRENT_V = 2;
+const CURRENT_V = 3;
 
 // Permanent Legacy (prestige) upgrades. Values are the number of times bought.
 function legacyDefaults() {
   return { fishSpeed: 0, friendSlow: 0, rainbowChance: 0, freeShark: 0 };
+}
+// Oyster Token run-boosts (counts of each purchased this run).
+function oysterDefaults() {
+  return { starfish: 0, friendSlow: 0, fishSpeed: 0, specialFreq: 0, allFreq: 0 };
 }
 
 function defaults() {
@@ -23,6 +27,9 @@ function defaults() {
     prestige: 0,           // number of legacy restarts done (drives difficulty ramp)
     legacyIntroSeen: false, // has the first-boss-clear Legacy explainer been shown?
     seahorsePowers: [],    // enabled Seahorse Powers (max = seahorses); swappable
+    // ---- Oyster Tokens ("Stuck?" catch-up) ----
+    oyster: oysterDefaults(), // run-scoped boost counts (reset on each oyster reset)
+    oysterTokens: 0,          // spendable tokens earned at the last reset
   };
 }
 
@@ -34,6 +41,12 @@ const MIGRATIONS = [
     save.legacy = legacyDefaults();
     save.seahorses = 0;
     save.prestige = 0;
+    return save;
+  },
+  // v2 -> v3: add oyster token fields.
+  (save) => {
+    save.oyster = oysterDefaults();
+    save.oysterTokens = 0;
     return save;
   },
 ];
@@ -51,6 +64,7 @@ export function load() {
     settings: Object.assign(defaults().settings, data.settings || {}),
     inventory: Object.assign(defaults().inventory, data.inventory || {}),
     legacy: Object.assign(legacyDefaults(), data.legacy || {}),
+    oyster: Object.assign(oysterDefaults(), data.oyster || {}),
   });
 }
 

@@ -2,6 +2,18 @@
 
 All notable changes to Fish Friends.
 
+## [1.33.0] — 2026-07-09
+- **New "Stuck?" catch-up system with Oyster Tokens 🦪.** Fail a level and a
+  **Stuck?** button appears. It opens a menu that explains the deal: reset your
+  progress to earn one **Oyster Token** for every 2 levels you'd reached, then
+  spend them (this run only) on boosts — you only get to choose after you reset:
+  - **Bonus Starfish** — +2 starfish now (max +10)
+  - **Sluggish Current** — −3% enemy fish speed (max −30%)
+  - **Swift Fins** — +5% your fish speed (max +50%)
+  - **Fewer Special Fish** — −5% white/black/tri per level (max −25%)
+  - **Calmer Seas** — −2% of all fish per level (max −20%)
+  Boosts last until your next reset.
+
 ## [1.32.2] — 2026-07-08
 - **Music stops when the app is in the background.** The soundtrack now pauses
   when you switch away from Fish Friends (or lock the screen) and resumes when

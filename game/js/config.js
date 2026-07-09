@@ -312,6 +312,36 @@ export function legacyValue(id, buys) {
 }
 
 // ---------------------------------------------------------------------------
+// Oyster Tokens — a "Stuck?" catch-up system. Reset your run progress to earn
+// one token per 2 levels reached, then spend them on RUN-ONLY boosts. Boosts
+// last until the next reset. `starfish` is granted immediately; the others feed
+// the sim (fishSpeed/friendSlow) or level generation (specialFreq/allFreq).
+// ---------------------------------------------------------------------------
+export const OYSTER_LEVELS_PER_TOKEN = 2;
+export const OYSTER_BOOSTS = {
+  starfish:    { id: 'starfish',    name: 'Bonus Starfish',     icon: '⭐', per: 2,    cap: 10,   kind: 'flat',
+                 desc: '+2 starfish to spend now (max +10).' },
+  friendSlow:  { id: 'friendSlow',  name: 'Sluggish Current',   icon: '🐌', per: 0.03, cap: 0.30, kind: 'pct',
+                 desc: '−3% speed for the fish swimming down at you (max −30%).' },
+  fishSpeed:   { id: 'fishSpeed',   name: 'Swift Fins',         icon: '⚡', per: 0.05, cap: 0.50, kind: 'pct',
+                 desc: '+5% speed for the fish you launch (max +50%).' },
+  specialFreq: { id: 'specialFreq', name: 'Fewer Special Fish', icon: '✨', per: 0.05, cap: 0.25, kind: 'pct',
+                 desc: '−5% white / black / tri fish each level (max −25%).' },
+  allFreq:     { id: 'allFreq',     name: 'Calmer Seas',        icon: '🌊', per: 0.02, cap: 0.20, kind: 'pct',
+                 desc: '−2% of all fish each level (max −20%).' },
+};
+export const OYSTER_BOOST_IDS = Object.keys(OYSTER_BOOSTS);
+export function oysterMaxBuys(id) {
+  const u = OYSTER_BOOSTS[id];
+  return u ? Math.round(u.cap / u.per) : 0;
+}
+export function oysterValue(id, buys) {
+  const u = OYSTER_BOOSTS[id];
+  if (!u) return 0;
+  return Math.min(u.cap, (buys || 0) * u.per);
+}
+
+// ---------------------------------------------------------------------------
 // Seahorse Powers. Each Seahorse Trophy lets you keep ONE power active (you can
 // enable up to `seahorses` of the five, and swap them any time — they aren't
 // consumed). Applied at runtime; they only ever help the player.

@@ -1,6 +1,7 @@
 // main.js — boot, Game controller, fixed-timestep loop. Wires all modules.
 import { TICK_DT, LEVEL, DEEP, POWERUPS, DEEP as DEEPCFG, TOTAL_LEVELS, BOSS_LEVEL,
-  LEGACY_UPGRADES, legacyValue, legacyMaxBuys, SEAHORSE_POWERS, SEAHORSE_POWER_IDS } from './config.js';
+  LEGACY_UPGRADES, legacyValue, legacyMaxBuys, SEAHORSE_POWERS, SEAHORSE_POWER_IDS,
+  OYSTER_BOOSTS, OYSTER_BOOST_IDS, oysterValue, oysterMaxBuys, OYSTER_LEVELS_PER_TOKEN } from './config.js';
 import { LEVELS, compileLevel, compileDeepBase, deepChunk, levelDefsFor } from './levels.js';
 import { Sim } from './sim.js';
 import { Render3D } from './render3d.js';
@@ -120,9 +121,10 @@ class Game {
       case 'codes': this.openSettings(); break;
       case 'powers': this.openLegacy(); break;
       case 'legacyintro': this.dismissLegacyIntro(); break;
+      case 'stuck': this.state = 'results'; this.ui.show('results'); break;
       case 'map': this.goToTitle(); break;
       case 'title': break;             // top level — stay put
-      default: this.goToMap(); break;  // prelevel, results, shop, settings, legacy
+      default: this.goToMap(); break;  // prelevel, results, shop, settings, legacy, oyster
     }
   }
 
@@ -197,20 +199,31 @@ class Game {
 
   openPreLevel(n) {
     this.levelN = n;
-    this.level = compileLevel(this.campaign[n - 1]);
+    this.level = compileLevel(this.campaign[n - 1], this._oysterLevelOpts());
     this.state = 'prelevel';
     this.ui.renderPreLevel(n, this.level);
     this.ui.show('prelevel');
   }
 
-  // Legacy upgrade effect values (fractions) passed to the Sim.
+  // Legacy upgrade effect values (fractions) passed to the Sim, combined with any
+  // active Oyster run-boosts (fishSpeed / friendSlow stack additively).
   _legacyOpts() {
     const lg = this.save.legacy || {};
+    const oy = this.save.oyster || {};
     return {
-      fishSpeed: legacyValue('fishSpeed', lg.fishSpeed),
-      friendSlow: legacyValue('friendSlow', lg.friendSlow),
+      fishSpeed: legacyValue('fishSpeed', lg.fishSpeed) + oysterValue('fishSpeed', oy.fishSpeed),
+      friendSlow: legacyValue('friendSlow', lg.friendSlow) + oysterValue('friendSlow', oy.friendSlow),
       rainbowChance: legacyValue('rainbowChance', lg.rainbowChance),
       freeShark: legacyValue('freeShark', lg.freeShark),
+    };
+  }
+
+  // Oyster level-generation boosts (thin all fish / special fish).
+  _oysterLevelOpts() {
+    const oy = this.save.oyster || {};
+    return {
+      allFreq: oysterValue('allFreq', oy.allFreq),
+      specialFreq: oysterValue('specialFreq', oy.specialFreq),
     };
   }
 
@@ -383,11 +396,60 @@ class Game {
     this.save.starfish = 0;
     this.save.inventory = { ice: 0, shark: 0, rainbow: 0, squid: 0 };
     this.save.bossDefeated = false; // upgrades locked until the boss is beaten again
+    this.save.oyster = { starfish: 0, friendSlow: 0, fishSpeed: 0, specialFreq: 0, allFreq: 0 };
+    this.save.oysterTokens = 0;     // a fresh journey clears run-boosts
     Save.save(this.save);
     this.campaign = levelDefsFor(this.save.prestige);
     Audio.sfx.star && Audio.sfx.star();
     this.ui.renderLegacy(this.save);
     this.goToMap();
+  }
+
+  // ---- Oyster Tokens ("Stuck?" catch-up) ---------------------------------
+  // Tokens you'd earn by resetting now: one per OYSTER_LEVELS_PER_TOKEN reached.
+  oysterTokensAvailable() {
+    return Math.floor((this.save.furthestLevel || 1) / OYSTER_LEVELS_PER_TOKEN);
+  }
+  // Explainer menu (opened from a failed level). Choices only unlock after reset.
+  openStuck() {
+    this.state = 'stuck';
+    this.ui.renderStuck(this.save, this.oysterTokensAvailable());
+    this.ui.show('stuck');
+  }
+  // Reset the run for tokens, then open the spend menu.
+  confirmOysterReset() {
+    const tokens = this.oysterTokensAvailable();
+    const yes = (typeof confirm === 'function')
+      ? confirm(`Reset your progress to earn ${tokens} Oyster Token${tokens === 1 ? '' : 's'}? You'll lose your level progress, starfish and items, but you can spend the tokens on boosts for your next run.`)
+      : true;
+    if (!yes) return;
+    this.save.furthestLevel = 1;
+    this.save.bestStars = {};
+    this.save.starfish = 0;
+    this.save.inventory = { ice: 0, shark: 0, rainbow: 0, squid: 0 };
+    this.save.oyster = { starfish: 0, friendSlow: 0, fishSpeed: 0, specialFreq: 0, allFreq: 0 };
+    this.save.oysterTokens = tokens;
+    Save.save(this.save);
+    Audio.sfx.star && Audio.sfx.star();
+    this.openOysterSpend();
+  }
+  openOysterSpend() {
+    this.state = 'oyster';
+    this.ui.renderOyster(this.save);
+    this.ui.show('oyster');
+  }
+  buyOyster(id) {
+    const b = OYSTER_BOOSTS[id];
+    if (!b) return;
+    if ((this.save.oysterTokens || 0) <= 0) return;
+    const cur = this.save.oyster[id] || 0;
+    if (cur >= oysterMaxBuys(id)) return; // at cap
+    this.save.oysterTokens -= 1;
+    this.save.oyster[id] = cur + 1;
+    if (id === 'starfish') this.save.starfish += b.per; // starfish granted immediately
+    Audio.sfx.buy && Audio.sfx.buy();
+    Save.save(this.save);
+    this.ui.renderOyster(this.save);
   }
 
   // ---- The Deep ----------------------------------------------------------

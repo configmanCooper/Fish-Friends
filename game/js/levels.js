@@ -151,24 +151,39 @@ export function levelDefsFor(prestige = 0) { return buildLevelDefs(prestige); }
 // Rows are spaced by required perfect-player launch time / apmGuardPct so the
 // level is always physically clearable.
 // ---------------------------------------------------------------------------
-export function compileLevel(def) {
+export function compileLevel(def, boosts) {
   if (def.kind === 'boss') return compileBossLevel(def);
   const rng = makeRng(def.seed);
   const pool = poolFor(def.colorsInPlay);
   const picker = pickerFor(pool);
   const lanes = def.lanes;
   const spawns = [];
+  // Oyster run-boosts (optional): thin out all fish and/or special fish.
+  const allFreqCut = Math.max(0, Math.min(0.9, (boosts && boosts.allFreq) || 0));
+  const specialFreqCut = Math.max(0, Math.min(0.9, (boosts && boosts.specialFreq) || 0));
   // Per-level duration (default = global). Spawns end ~10s before the clock so
   // stragglers can resolve.
   const duration = def.duration || LEVEL.duration;
   const spawnWindow = def.spawnWindow || Math.max(10, duration - 10);
 
-  // Special budget to inject across the level.
+  // Special budget to inject across the level (trimmed by the specialFreq boost).
   const specialsLeft = {
     white: (def.specials && def.specials.white) || 0,
     black: (def.specials && def.specials.black) || 0,
     tri: (def.specials && def.specials.tri) || 0,
   };
+  if (specialFreqCut > 0) {
+    // Remove a proportional share of the TOTAL specials (per-kind rounding would
+    // leave small counts untouched), taking from the largest kind each time.
+    let removeN = Math.round((specialsLeft.white + specialsLeft.black + specialsLeft.tri) * specialFreqCut);
+    while (removeN > 0) {
+      let k = 'white';
+      if (specialsLeft.black > specialsLeft[k]) k = 'black';
+      if (specialsLeft.tri > specialsLeft[k]) k = 'tri';
+      if (specialsLeft[k] <= 0) break;
+      specialsLeft[k]--; removeN--;
+    }
+  }
   const totalSpecials = specialsLeft.white + specialsLeft.black + specialsLeft.tri;
 
   // Density reduction on "new thing" levels (~20% fewer rows via larger gap).
@@ -223,9 +238,10 @@ export function compileLevel(def) {
 
     // Compute perfect-player launch time to resolve this row, then space next row.
     // Wider gaps (÷ FISH_DENSITY) => ~10% fewer rows/fish across every level.
+    // The allFreq oyster boost widens gaps further to thin every level's fish.
     const rowCost = rowLaunchTime(rowSpawns);
     const gap = (Math.max(def.minGap, rowCost / LEVEL.apmGuardPct) * gapScale
-      + rng.next() * 0.4) / FISH_DENSITY;
+      + rng.next() * 0.4) / (FISH_DENSITY * (1 - allFreqCut));
     t += gap;
     rowIndex++;
   }
