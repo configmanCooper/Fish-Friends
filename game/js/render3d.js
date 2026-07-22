@@ -797,13 +797,13 @@ export class Render3D {
             + 0.025 * sin(vWx * 1.1 - uTime * 0.9);
           float d = vWy - edge;                   // >0 = ocean side of the foam line
 
-          // Shallow water: a light-blue, mostly-transparent band from the foam
-          // line up toward the ocean, with a very subtle drifting foam texture —
-          // simulates a thin sheet of ocean lapping onto the shore.
+          // Shallow water: a light-blue band from the foam line up toward the
+          // ocean, with a very subtle drifting foam texture — simulates a thin
+          // sheet of ocean lapping onto the shore.
           float shallow = smoothstep(0.0, 0.14, d) * smoothstep(1.95, edge + 0.2, vWy);
           float sfoam = smoothstep(0.62, 1.0,
             0.5 + 0.5 * sin(vWx * 2.4 - uTime * 0.6 + vWy * 3.5));
-          float shallowA = shallow * (0.20 + sfoam * 0.09);
+          float shallowA = shallow * (0.42 + sfoam * 0.14);
 
           // Soft foam line at the water's leading edge + wet-sand band below it.
           float foam = smoothstep(0.16, 0.0, abs(d));
@@ -811,10 +811,10 @@ export class Render3D {
 
           // brown wet sand below the line, light blue shallow water above,
           // white foam right at the line.
-          vec3 col = mix(vec3(0.34, 0.24, 0.11), vec3(0.60, 0.82, 0.92),
+          vec3 col = mix(vec3(0.34, 0.24, 0.11), vec3(0.66, 0.87, 0.97),
             smoothstep(-0.04, 0.04, d));
           col = mix(col, vec3(0.95, 0.99, 1.0), foam);
-          float a = max(max(wet * 0.14, shallowA), foam * 0.42);
+          float a = max(max(wet * 0.16, shallowA), foam * 0.5);
           a *= smoothstep(2.1, 1.9, vWy);         // never linger in the deep ocean
           gl_FragColor = vec4(col, a);
         }`,
