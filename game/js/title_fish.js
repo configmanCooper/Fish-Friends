@@ -96,19 +96,21 @@ class OrbitPair {
     const ctx = this.ctx, W = this.canvas.width, Hc = this.canvas.height;
     ctx.clearRect(0, 0, W, Hc);
     const cx = W / 2, cy = Hc / 2;
-    const rr = W * 0.20;      // orbit radius (tight)
-    const S = W * 0.34;       // fish scale
-    this.ang = t * 1.3;       // orbit speed (rad/s)
+    const rr = W * 0.27;      // orbit radius (roomy so the circle reads clearly)
+    const S = W * 0.25;       // fish scale (small enough that they don't overlap)
+    this.ang = t * 1.5;       // orbit speed (rad/s)
     const fish = [{ c: this.a, off: 0 }, { c: this.b, off: Math.PI }];
     for (const f of fish) {
       const th = this.ang + f.off;
       const x = cx + Math.cos(th) * rr;
       const y = cy + Math.sin(th) * rr;
-      // velocity tangent (ccw): angle th + 90deg; fish is drawn nose-up (-y),
-      // so rotate by th + 90deg to align the nose with travel.
+      // The fish is drawn nose-up (local -y). Its travel direction (ccw tangent)
+      // is th + PI/2 in world; aligning the nose with travel needs a rotation of
+      // th + PI (derived for canvas's y-down space) so each fish faces the way it
+      // swims — chasing the other around the circle.
       ctx.save();
       ctx.translate(x, y);
-      ctx.rotate(th + Math.PI / 2);
+      ctx.rotate(th + Math.PI);
       drawGameFish(ctx, S, f.c.css, f.c.pattern);
       ctx.restore();
     }

@@ -2,6 +2,18 @@
 
 All notable changes to Fish Friends.
 
+## [1.34.1] — 2026-07-22
+- **Title screen: fish now swim both ways and pair off.** Alongside the fish
+  rising from the bottom, fish now swim **down from the top**, and when an
+  up-fish meets a down-fish of the **opposite colour** they become friends and
+  peel off together with a little sparkle — just like in the game.
+- **Circling title fish fixed.** The two little fish beside the title now
+  properly **chase each other around a circle** (previously they faced the wrong
+  way and looked joined at the tail), and they're sized to read clearly.
+- **Smoother, subtler shoreline.** The beach wave is no longer grainy — it's a
+  soft foam line with a faint wet-sand sheen, and it now stays **on the beach**
+  only (no bright waterline floating out in the open ocean).
+
 ## [1.34.0] — 2026-07-13
 - **Livelier beach & ocean.** The shoreline now has an animated foam waterline
   that washes up and down the sand (tide + wavelets) with a wet-sand sheen, and

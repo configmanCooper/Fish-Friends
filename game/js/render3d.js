@@ -775,41 +775,42 @@ export class Render3D {
     }
   }
 
-  // Animated shoreline: a foam waterline that washes up and down the sand (tide +
-  // wavelets) with a wet-sand sheen, plus scattered shells & starfish on the sand.
+  // Animated shoreline: a soft foam line where a gentle wave washes UP and DOWN
+  // the sand (tide + slow wavelets) with a subtle wet-sand sheen. Confined to the
+  // beach (below the sand's top edge) so nothing shows out in the open ocean.
   _buildBeach() {
     const geo = new THREE.PlaneGeometry(48, 4, 1, 1);
     const mat = new THREE.ShaderMaterial({
       transparent: true, depthWrite: false,
       uniforms: { uTime: { value: 0 } },
-      vertexShader: `varying vec2 vUv; varying float vWx;
-        void main(){ vUv=uv; vWx=position.x;
+      vertexShader: `varying float vWy; varying float vWx;
+        void main(){ vWx = position.x; vWy = position.y + 2.0; // world y (plane centred at y=2)
           gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
       fragmentShader: `
         precision highp float;
-        varying vec2 vUv; varying float vWx; uniform float uTime;
-        float hash(vec2 p){ return fract(sin(dot(p, vec2(41.3,289.1)))*43758.5453); }
+        varying float vWy; varying float vWx; uniform float uTime;
         void main(){
-          float wy = vUv.y * 4.0;                 // world y across the plane (0..4)
-          float tide = 0.34 * sin(uTime*0.30);    // whole waterline advances/recedes
-          float edge = 1.55 + tide
-            + 0.20*sin(vWx*0.7 + uTime*0.9)
-            + 0.09*sin(vWx*1.9 - uTime*1.5);
-          float d = wy - edge;                    // >0 above the line (water side)
-          float bub = hash(floor(vec2(vWx*5.0, wy*6.0 - uTime*2.2)));
-          float bub2 = hash(floor(vec2(vWx*9.0 + 3.0, wy*10.0 - uTime*3.1)));
-          float foamBand = smoothstep(0.34, 0.0, abs(d));
-          float foam = foamBand * (0.5 + 0.3*bub + 0.2*bub2);
-          float crest = smoothstep(0.06, 0.0, abs(d - 0.02));
+          float sandTop = 1.5;                    // seabed spans worldY 0..1.5
+          // waterline washes up/down the sand: slow tide + gentle long wavelets.
+          float tide = 0.42 * sin(uTime * 0.26);
+          float edge = 0.95 + tide
+            + 0.05 * sin(vWx * 0.45 + uTime * 0.6)
+            + 0.025 * sin(vWx * 1.1 - uTime * 0.9);
+          float d = vWy - edge;                   // >0 above the waterline
+          // only ever draw on the sand (fade out at the sand's top edge)
+          float onSand = smoothstep(sandTop + 0.02, sandTop - 0.10, vWy);
+          // soft foam line at the water's leading edge
+          float foam = smoothstep(0.16, 0.0, abs(d));
+          // faint wet-sand sheen just below the foam (recently washed sand)
           float wet = smoothstep(0.0, -0.55, d) * step(d, 0.0);
-          vec3 col = mix(vec3(0.30,0.21,0.10), vec3(1.0), clamp(foam*1.5 + crest, 0.0, 1.0));
-          float a = max(foam*0.55 + crest*0.4, wet*0.15);
+          vec3 col = mix(vec3(0.34, 0.24, 0.11), vec3(0.92, 0.98, 1.0), clamp(foam, 0.0, 1.0));
+          float a = (foam * 0.42 + wet * 0.14) * onSand;
           gl_FragColor = vec4(col, a);
         }`,
     });
     this.shoreMat = mat;
     const shore = new THREE.Mesh(geo, mat);
-    shore.position.set(0, 2.0, -3.6);
+    shore.position.set(0, 2.0, -3.7);
     shore.renderOrder = 1;
     this.scene.add(shore);
 
@@ -888,49 +889,42 @@ export class Render3D {
     }
   }
 
-  // Ambient menu fish: colorful fish (and opposite-color "friend" pairs) drifting
-  // up from the bottom behind the menus. Shown only when not in an active level.
+  // Ambient menu fish: colorful fish drift both UP from the bottom and DOWN from
+  // the top behind the menus. When an up-fish meets a down-fish of the OPPOSITE
+  // colour, they pair off and swim away together as "friends" (like in-game).
+  // Shown only when not in an active level.
   _buildAmbientFish() {
     this.ambientFish = [];
     this.ambientVisible = false;
+    this._ambientPalette = ['blue', 'orange', 'red', 'green', 'yellow', 'purple'];
     const geo = buildFishGeometry();
-    const baseColors = [0x2f7be6, 0xf08a2a, 0xe23b3b, 0x35b84a, 0xf4d21e, 0x9a4fd0];
-    const pairs = [[0x2f7be6, 0xf08a2a], [0xe23b3b, 0x35b84a], [0xf4d21e, 0x9a4fd0]];
-    const mk = (hex) => {
+    for (let i = 0; i < 16; i++) {
       const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
-        color: hex, transparent: true, opacity: 0.9, side: THREE.DoubleSide }));
+        color: 0xffffff, transparent: true, opacity: 0.9, side: THREE.DoubleSide }));
       m.visible = false; m.renderOrder = 0;
       this.scene.add(m);
-      return m;
-    };
-    // Nine singles + three friend-pairs (12 slots).
-    for (let i = 0; i < 9; i++) {
-      const hex = baseColors[i % baseColors.length];
-      this.ambientFish.push(this._newAmbient(mk(hex), null));
+      const f = { mesh: m, colorId: 'blue', dir: 1, x: 0, y: 0, z: -2.6, spd: 1,
+        sway: 0.4, phase: 0, scale: 0.7, state: 'swim', vx: 0, life: 0 };
+      this.ambientFish.push(f);
+      this._respawnAmbient(f, true, i % 2 === 0 ? 1 : -1);
     }
-    for (let i = 0; i < 3; i++) {
-      const [a, b] = pairs[i];
-      const fa = this._newAmbient(mk(a), null);
-      const fb = this._newAmbient(mk(b), null);
-      fb.partner = fa; fa.partner = fb; fa.lead = true;
-      this.ambientFish.push(fa, fb);
-    }
-    for (const f of this.ambientFish) this._respawnAmbient(f, true);
   }
 
-  _newAmbient(mesh) {
-    return { mesh, x: 0, y: 0, z: -2.6, spd: 1, sway: 0, phase: 0, scale: 0.7, partner: null, lead: false };
-  }
-  _respawnAmbient(f, initial) {
-    if (f.partner && !f.lead) return; // followers are placed relative to their lead
-    f.x = (Math.random() - 0.5) * (this.W ? this.W * 1.1 : 6);
-    f.y = initial ? Math.random() * H : -0.8 - Math.random() * 1.5;
+  _respawnAmbient(f, initial, forceDir) {
+    const pal = this._ambientPalette;
+    f.colorId = pal[Math.floor(Math.random() * pal.length)];
+    f.mesh.material.color.setHex(COLORS[f.colorId].hex);
+    f.mesh.material.opacity = 0.9;
+    f.dir = forceDir != null ? forceDir : (Math.random() < 0.5 ? 1 : -1);
+    f.x = (Math.random() - 0.5) * (this.W ? this.W * 1.05 : 6);
     f.z = -2.2 - Math.random() * 1.4;
-    f.spd = 0.7 + Math.random() * 0.7;
-    f.sway = 0.3 + Math.random() * 0.5;
+    f.spd = 0.55 + Math.random() * 0.5;
+    f.sway = 0.25 + Math.random() * 0.4;
     f.phase = Math.random() * 6.28;
-    f.scale = 0.55 + Math.random() * 0.4;
-    if (f.partner) { f.partner.z = f.z; f.partner.spd = f.spd; f.partner.scale = f.scale; }
+    f.scale = 0.55 + Math.random() * 0.35;
+    f.state = 'swim'; f.vx = 0; f.life = 0;
+    if (f.dir > 0) f.y = initial ? Math.random() * H : -0.8 - Math.random() * 1.4;
+    else f.y = initial ? Math.random() * H : H + 0.8 + Math.random() * 1.4;
   }
 
   setAmbientVisible(v) {
@@ -941,21 +935,50 @@ export class Render3D {
 
   _updateAmbientFish(dt) {
     if (!this.ambientVisible) return;
-    for (const f of this.ambientFish) {
-      if (f.partner && !f.lead) continue; // moved by its lead
-      f.y += f.spd * dt;
-      const sx = Math.sin(this.time * 1.3 + f.phase) * f.sway * 0.35;
+    const A = this.ambientFish;
+    // move + place
+    for (const f of A) {
       const m = f.mesh;
+      if (f.state === 'paired') {
+        f.life += dt;
+        f.x += f.vx * dt;
+        f.y += f.spd * 0.45 * dt;                  // friends drift gently upward together
+        m.material.opacity = Math.max(0, 0.9 * (1 - f.life / 2.2));
+        if (f.life > 2.2) { this._respawnAmbient(f, false); continue; }
+      } else {
+        f.y += f.dir * f.spd * dt;
+        if (f.dir > 0 && f.y > H + 1) { this._respawnAmbient(f, false); continue; }
+        if (f.dir < 0 && f.y < -1) { this._respawnAmbient(f, false); continue; }
+      }
+      const sx = Math.sin(this.time * 1.3 + f.phase) * f.sway * 0.3;
+      const waggle = Math.sin(this.time * 1.3 + f.phase) * 0.12;
       m.position.set(f.x + sx, f.y, f.z);
       m.scale.setScalar(f.scale);
-      m.rotation.z = Math.sin(this.time * 1.3 + f.phase) * 0.12; // gentle waggle, nose up
-      if (f.partner) {
-        const p = f.partner.mesh;
-        p.position.set(f.x + sx + f.scale * 0.62, f.y - f.scale * 0.05, f.z);
-        p.scale.setScalar(f.scale);
-        p.rotation.z = m.rotation.z;
+      // up / paired fish point up; down fish point down
+      m.rotation.z = (f.dir > 0 || f.state === 'paired' ? 0 : Math.PI) + waggle;
+    }
+    // dynamic pairing: an up-fish and a down-fish of opposite colour that meet
+    // become friends and peel off together.
+    for (let i = 0; i < A.length; i++) {
+      const a = A[i];
+      if (a.state !== 'swim' || a.dir < 0) continue;   // a = an up-fish
+      for (let j = 0; j < A.length; j++) {
+        const b = A[j];
+        if (b.state !== 'swim' || b.dir > 0) continue;  // b = a down-fish
+        if (COLORS[a.colorId].opposite !== b.colorId) continue;
+        const ax = a.mesh.position.x, ay = a.mesh.position.y;
+        const bx = b.mesh.position.x, by = b.mesh.position.y;
+        if (Math.abs(ax - bx) < 0.55 && Math.abs(ay - by) < 0.5 && Math.abs(a.z - b.z) < 1.0) {
+          const midx = (ax + bx) / 2, midy = (ay + by) / 2;
+          const side = midx < 0 ? -1 : 1;
+          a.state = b.state = 'paired'; a.life = b.life = 0;
+          a.vx = side * 1.5; b.vx = side * 1.5;
+          a.x = midx - 0.22; b.x = midx + 0.22; a.y = b.y = midy;
+          a.z = b.z = Math.max(a.z, b.z);
+          if (this.fx) this.fx.spawn(midx, midy, -1.0, 0xffffff, { count: 10, speed: 0.7, size: 5, life: 0.6 });
+          break;
+        }
       }
-      if (f.y > H + 1) this._respawnAmbient(f, false);
     }
   }
 
