@@ -2,6 +2,11 @@
 
 All notable changes to Fish Friends.
 
+## [1.34.2] — 2026-07-22
+- **Shallow water at the shore.** The strip between the foam line and the open
+  ocean is now a light-blue, mostly-transparent, gently-foamy band that shifts
+  with the tide — simulating a thin sheet of ocean lapping onto the beach.
+
 ## [1.34.1] — 2026-07-22
 - **Title screen: fish now swim both ways and pair off.** Alongside the fish
   rising from the bottom, fish now swim **down from the top**, and when an

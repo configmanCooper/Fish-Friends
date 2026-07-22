@@ -790,21 +790,32 @@ export class Render3D {
         precision highp float;
         varying float vWy; varying float vWx; uniform float uTime;
         void main(){
-          float sandTop = 1.5;                    // seabed spans worldY 0..1.5
           // waterline washes up/down the sand: slow tide + gentle long wavelets.
           float tide = 0.42 * sin(uTime * 0.26);
           float edge = 0.95 + tide
             + 0.05 * sin(vWx * 0.45 + uTime * 0.6)
             + 0.025 * sin(vWx * 1.1 - uTime * 0.9);
-          float d = vWy - edge;                   // >0 above the waterline
-          // only ever draw on the sand (fade out at the sand's top edge)
-          float onSand = smoothstep(sandTop + 0.02, sandTop - 0.10, vWy);
-          // soft foam line at the water's leading edge
+          float d = vWy - edge;                   // >0 = ocean side of the foam line
+
+          // Shallow water: a light-blue, mostly-transparent band from the foam
+          // line up toward the ocean, with a very subtle drifting foam texture —
+          // simulates a thin sheet of ocean lapping onto the shore.
+          float shallow = smoothstep(0.0, 0.14, d) * smoothstep(1.95, edge + 0.2, vWy);
+          float sfoam = smoothstep(0.62, 1.0,
+            0.5 + 0.5 * sin(vWx * 2.4 - uTime * 0.6 + vWy * 3.5));
+          float shallowA = shallow * (0.20 + sfoam * 0.09);
+
+          // Soft foam line at the water's leading edge + wet-sand band below it.
           float foam = smoothstep(0.16, 0.0, abs(d));
-          // faint wet-sand sheen just below the foam (recently washed sand)
-          float wet = smoothstep(0.0, -0.55, d) * step(d, 0.0);
-          vec3 col = mix(vec3(0.34, 0.24, 0.11), vec3(0.92, 0.98, 1.0), clamp(foam, 0.0, 1.0));
-          float a = (foam * 0.42 + wet * 0.14) * onSand;
+          float wet = smoothstep(-0.6, 0.0, d) * step(d, 0.0);
+
+          // brown wet sand below the line, light blue shallow water above,
+          // white foam right at the line.
+          vec3 col = mix(vec3(0.34, 0.24, 0.11), vec3(0.60, 0.82, 0.92),
+            smoothstep(-0.04, 0.04, d));
+          col = mix(col, vec3(0.95, 0.99, 1.0), foam);
+          float a = max(max(wet * 0.14, shallowA), foam * 0.42);
+          a *= smoothstep(2.1, 1.9, vWy);         // never linger in the deep ocean
           gl_FragColor = vec4(col, a);
         }`,
     });
