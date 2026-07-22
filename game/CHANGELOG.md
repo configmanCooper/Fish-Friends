@@ -2,6 +2,11 @@
 
 All notable changes to Fish Friends.
 
+## [1.34.4] — 2026-07-22
+- **Shoreline no longer bleeds into the ocean.** Clamped the shallow-water and
+  foam shimmer to fade out exactly at the sand's top edge, so the effect stays
+  on the beach and never washes up into the open water.
+
 ## [1.34.3] — 2026-07-22
 - **Shallow water at the shore.** The strip between the foam line and the open
   ocean is a light-blue, gently-foamy band that shifts with the tide — a thin
