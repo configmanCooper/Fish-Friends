@@ -55,8 +55,11 @@ html, body {
 
 /* title */
 .title-wrap { display: flex; flex-direction: column; align-items: center; text-align: center; }
-.logo { font-size: 44px; font-weight: 800; letter-spacing: 1px; margin-bottom: var(--s-2);
+.logo-row { display: flex; align-items: center; justify-content: center; gap: 2px; margin-bottom: var(--s-2); }
+.logo { font-size: 40px; font-weight: 800; letter-spacing: 1px;
   text-shadow: 0 3px 12px rgba(0,0,0,0.5); }
+.title-fish { width: 66px; height: 66px; flex: 0 0 auto;
+  filter: drop-shadow(0 2px 5px rgba(0,0,0,0.4)); }
 .tagline { color: var(--c-ink-dim); margin-bottom: var(--s-5); max-width: 320px; }
 
 /* map */

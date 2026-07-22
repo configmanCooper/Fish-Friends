@@ -5,6 +5,7 @@ import { POWERUPS, INV_CAP, LEVEL, DEEP, COOLDOWN_ENABLED,
   SEAHORSE_POWERS, SEAHORSE_POWER_IDS, bossTypeFor, TURTLE,
   OYSTER_BOOSTS, OYSTER_BOOST_IDS, oysterMaxBuys, oysterValue, OYSTER_LEVELS_PER_TOKEN } from './config.js';
 import { LEVELS } from './levels.js';
+import { TitleFish } from './title_fish.js';
 
 const SCREENS = ['title', 'map', 'prelevel', 'game', 'results', 'shop', 'settings', 'codes', 'legacy', 'legacyintro', 'powers', 'stuck', 'oyster', 'bossbonus'];
 
@@ -78,13 +79,20 @@ export class UI {
     this.game = game;
     this._build();
     this._bind();
+    // Title decoration: two opposite-color fish pairs chasing in a circle.
+    this.titleFish = new TitleFish();
+    this.titleFish.mount('tf-left', 'tf-right', 'blue', 'red');
   }
 
   _build() {
     this.root.innerHTML = `
       <div class="screen" id="s-title">
         <div class="title-wrap">
-          <div class="logo">🐟 Fish Friends</div>
+          <div class="logo-row">
+            <canvas class="title-fish" id="tf-left" width="132" height="132"></canvas>
+            <div class="logo">Fish Friends</div>
+            <canvas class="title-fish" id="tf-right" width="132" height="132"></canvas>
+          </div>
           <div class="tagline">Match opposite colors — send them swimming off together.</div>
           <button class="btn btn-primary" data-action="play">Play</button>
           <button class="btn" data-action="deep" id="btn-deep">The Deep 🌊</button>
@@ -371,6 +379,11 @@ export class UI {
       if (el) el.classList.toggle('active', s === screen);
     }
     if (screen !== 'game') { this.hidePause(); this.updateBossHud(null); }
+    // Run the circling title fish only while the title screen is visible.
+    if (this.titleFish) {
+      if (screen === 'title') this.titleFish.start();
+      else this.titleFish.stop();
+    }
   }
 
   // ---- Title / Map -------------------------------------------------------

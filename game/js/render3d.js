@@ -206,6 +206,137 @@ function makeSplatTexture(seed) {
   });
 }
 
+// --- Beach & ocean decor textures -------------------------------------------
+// A scallop / fan shell with ribs.
+function makeShellScallop(hue) {
+  return _canvasTex(128, 128, (g, w, h) => {
+    const cx = w / 2, cy = h * 0.62, R = w * 0.42;
+    const fan = () => {
+      g.beginPath();
+      g.moveTo(cx, cy);
+      g.arc(cx, cy, R, Math.PI * 1.12, Math.PI * 1.88, false);
+      g.closePath();
+    };
+    const grd = g.createLinearGradient(cx, cy - R, cx, cy);
+    grd.addColorStop(0, hue.light); grd.addColorStop(1, hue.dark);
+    g.fillStyle = grd; fan(); g.fill();
+    // ribs
+    g.save(); fan(); g.clip();
+    g.strokeStyle = 'rgba(90,60,40,0.35)'; g.lineWidth = 2;
+    for (let i = -4; i <= 4; i++) {
+      const a = Math.PI * 1.5 + i * 0.09;
+      g.beginPath(); g.moveTo(cx, cy);
+      g.lineTo(cx + Math.cos(a) * R * 1.1, cy + Math.sin(a) * R * 1.1); g.stroke();
+    }
+    g.restore();
+    // hinge bumps
+    g.fillStyle = hue.dark;
+    g.beginPath(); g.ellipse(cx, cy + 2, R * 0.18, R * 0.10, 0, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(70,45,30,0.5)'; g.lineWidth = 2.5; fan(); g.stroke();
+  });
+}
+// A spiral conch/snail shell.
+function makeShellSpiral(hue) {
+  return _canvasTex(128, 128, (g, w, h) => {
+    const cx = w * 0.52, cy = h * 0.52;
+    g.strokeStyle = hue.dark; g.lineCap = 'round';
+    for (let layer = 0; layer < 2; layer++) {
+      g.lineWidth = layer === 0 ? w * 0.30 : w * 0.20;
+      g.strokeStyle = layer === 0 ? hue.dark : hue.light;
+      g.beginPath();
+      let first = true;
+      for (let t = 0; t < Math.PI * 3.4; t += 0.14) {
+        const r = 4 + t * 6.4;
+        const x = cx + Math.cos(t) * r, y = cy + Math.sin(t) * r;
+        if (first) { g.moveTo(x, y); first = false; } else g.lineTo(x, y);
+      }
+      g.stroke();
+    }
+    g.strokeStyle = 'rgba(80,55,35,0.4)'; g.lineWidth = 2;
+    g.beginPath();
+    let first = true;
+    for (let t = 0; t < Math.PI * 3.4; t += 0.14) {
+      const r = 4 + t * 6.4;
+      const x = cx + Math.cos(t) * r, y = cy + Math.sin(t) * r;
+      if (first) { g.moveTo(x, y); first = false; } else g.lineTo(x, y);
+    }
+    g.stroke();
+  });
+}
+// A small starfish.
+function makeShellStar(hue) {
+  return _canvasTex(128, 128, (g, w, h) => {
+    const cx = w / 2, cy = h / 2, R = w * 0.42, r = R * 0.44;
+    const star = () => {
+      g.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = -Math.PI / 2 + i * Math.PI / 5;
+        const rad = i % 2 === 0 ? R : r;
+        const x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad;
+        if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+      }
+      g.closePath();
+    };
+    const grd = g.createRadialGradient(cx, cy, r * 0.3, cx, cy, R);
+    grd.addColorStop(0, hue.light); grd.addColorStop(1, hue.dark);
+    g.fillStyle = grd; star(); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.5)';
+    for (let i = 0; i < 5; i++) {
+      const a = -Math.PI / 2 + i * 2 * Math.PI / 5;
+      for (let k = 1; k <= 3; k++) {
+        const rr = R * (0.35 + k * 0.16);
+        g.beginPath(); g.arc(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, 1.6, 0, 7); g.fill();
+      }
+    }
+    g.strokeStyle = 'rgba(120,70,40,0.4)'; g.lineWidth = 2; star(); g.stroke();
+  });
+}
+// A round pebble / sand dollar.
+function makePebble(hue) {
+  return _canvasTex(96, 96, (g, w, h) => {
+    const cx = w / 2, cy = h / 2, R = w * 0.4;
+    const grd = g.createRadialGradient(cx - R * 0.3, cy - R * 0.3, R * 0.2, cx, cy, R);
+    grd.addColorStop(0, hue.light); grd.addColorStop(1, hue.dark);
+    g.fillStyle = grd; g.beginPath(); g.ellipse(cx, cy, R, R * 0.86, 0, 0, 7); g.fill();
+    // five-petal sand-dollar hint
+    g.strokeStyle = 'rgba(120,110,90,0.35)'; g.lineWidth = 1.6;
+    for (let i = 0; i < 5; i++) {
+      const a = -Math.PI / 2 + i * 2 * Math.PI / 5;
+      g.beginPath(); g.ellipse(cx + Math.cos(a) * R * 0.32, cy + Math.sin(a) * R * 0.32,
+        R * 0.30, R * 0.11, a + Math.PI / 2, 0, 7); g.stroke();
+    }
+  });
+}
+// A wavy kelp / seaweed strand (tall, tapering), pivoting from its base.
+function makeKelpTexture(hue) {
+  return _canvasTex(96, 320, (g, w, h) => {
+    const cx = w / 2;
+    g.fillStyle = hue;
+    // central stalk with alternating leaf blades
+    g.beginPath();
+    g.moveTo(cx - 5, h);
+    for (let y = h; y > 8; y -= 6) {
+      const sway = Math.sin(y * 0.06) * 10;
+      g.lineTo(cx + sway - 4, y);
+    }
+    for (let y = 12; y < h; y += 6) {
+      const sway = Math.sin(y * 0.06) * 10;
+      g.lineTo(cx + sway + 4, y);
+    }
+    g.closePath(); g.fill();
+    // leaf blades
+    for (let y = h - 24; y > 24; y -= 30) {
+      const sway = Math.sin(y * 0.06) * 10;
+      const side = (Math.floor(y / 30) % 2) ? 1 : -1;
+      g.beginPath();
+      g.moveTo(cx + sway, y);
+      g.quadraticCurveTo(cx + sway + side * 26, y - 14, cx + sway + side * 10, y - 30);
+      g.quadraticCurveTo(cx + sway + side * 4, y - 14, cx + sway, y);
+      g.fill();
+    }
+  });
+}
+
 
 export class Render3D {
   constructor(canvas) {
@@ -223,6 +354,9 @@ export class Render3D {
     this.triFish = new Map(); // id -> {mesh, bands, phase}
 
     this._buildBackground();
+    this._buildBeach();
+    this._buildOceanAmbience();
+    this._buildAmbientFish();
     this._buildLights();
     this._buildFishMesh();
     this._buildTriPrototype();
@@ -641,6 +775,190 @@ export class Render3D {
     }
   }
 
+  // Animated shoreline: a foam waterline that washes up and down the sand (tide +
+  // wavelets) with a wet-sand sheen, plus scattered shells & starfish on the sand.
+  _buildBeach() {
+    const geo = new THREE.PlaneGeometry(48, 4, 1, 1);
+    const mat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false,
+      uniforms: { uTime: { value: 0 } },
+      vertexShader: `varying vec2 vUv; varying float vWx;
+        void main(){ vUv=uv; vWx=position.x;
+          gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+      fragmentShader: `
+        precision highp float;
+        varying vec2 vUv; varying float vWx; uniform float uTime;
+        float hash(vec2 p){ return fract(sin(dot(p, vec2(41.3,289.1)))*43758.5453); }
+        void main(){
+          float wy = vUv.y * 4.0;                 // world y across the plane (0..4)
+          float tide = 0.34 * sin(uTime*0.30);    // whole waterline advances/recedes
+          float edge = 1.55 + tide
+            + 0.20*sin(vWx*0.7 + uTime*0.9)
+            + 0.09*sin(vWx*1.9 - uTime*1.5);
+          float d = wy - edge;                    // >0 above the line (water side)
+          float bub = hash(floor(vec2(vWx*5.0, wy*6.0 - uTime*2.2)));
+          float bub2 = hash(floor(vec2(vWx*9.0 + 3.0, wy*10.0 - uTime*3.1)));
+          float foamBand = smoothstep(0.34, 0.0, abs(d));
+          float foam = foamBand * (0.5 + 0.3*bub + 0.2*bub2);
+          float crest = smoothstep(0.06, 0.0, abs(d - 0.02));
+          float wet = smoothstep(0.0, -0.55, d) * step(d, 0.0);
+          vec3 col = mix(vec3(0.30,0.21,0.10), vec3(1.0), clamp(foam*1.5 + crest, 0.0, 1.0));
+          float a = max(foam*0.55 + crest*0.4, wet*0.15);
+          gl_FragColor = vec4(col, a);
+        }`,
+    });
+    this.shoreMat = mat;
+    const shore = new THREE.Mesh(geo, mat);
+    shore.position.set(0, 2.0, -3.6);
+    shore.renderOrder = 1;
+    this.scene.add(shore);
+
+    // Scattered shells / starfish / pebbles on the sand (deterministic layout).
+    const hues = {
+      cream: { light: '#fff3df', dark: '#e4c79b' },
+      pink:  { light: '#ffe1e6', dark: '#e39aa8' },
+      gold:  { light: '#ffe9b8', dark: '#d9ab5b' },
+      coral: { light: '#ffd9c2', dark: '#e0906a' },
+      grey:  { light: '#e9e6df', dark: '#b9b3a6' },
+    };
+    const makers = [
+      () => makeShellScallop(hues.cream), () => makeShellScallop(hues.pink),
+      () => makeShellSpiral(hues.gold),  () => makeShellSpiral(hues.coral),
+      () => makeShellStar(hues.coral),   () => makeShellStar(hues.gold),
+      () => makePebble(hues.grey),       () => makePebble(hues.cream),
+    ];
+    // [x, y(worldY on sand), scale, makerIndex, rot] — clustered toward the
+    // centre so they show on narrow phones; a few wider ones for big screens.
+    const layout = [
+      [-2.05, 0.55, 0.42, 0, 0.3], [-1.55, 0.98, 0.30, 6, -0.4], [-1.1, 0.42, 0.44, 4, 0.1],
+      [-0.55, 0.82, 0.30, 2, 0.9], [0.0, 0.45, 0.40, 1, -0.2], [0.6, 0.95, 0.28, 7, 0.5],
+      [1.05, 0.5, 0.44, 5, -0.6], [1.6, 0.88, 0.32, 3, 0.2], [2.05, 0.46, 0.44, 0, 1.1],
+      [-4.6, 0.7, 0.4, 6, -0.3], [4.6, 0.6, 0.42, 2, 0.6], [6.6, 0.85, 0.4, 4, -0.8],
+      [-6.6, 0.5, 0.38, 7, 0.4], [-3.3, 0.5, 0.34, 3, 0.7],
+    ];
+    this.beachDecor = [];
+    for (const [x, y, sc, mi, rot] of layout) {
+      const tex = makers[mi]();
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+        new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+      m.position.set(x, y, -3.75);
+      m.scale.setScalar(sc);
+      m.rotation.z = rot;
+      m.renderOrder = 1;
+      this.scene.add(m);
+      this.beachDecor.push({ mesh: m, baseRot: rot, phase: x * 1.3, baseScale: sc });
+    }
+  }
+
+  // Subtle ocean ambience: swaying kelp near the seabed corners + a few faint,
+  // slow-drifting distant fish silhouettes far in the background. Deliberately
+  // low-contrast and slow so it never competes with gameplay.
+  _buildOceanAmbience() {
+    // Kelp strands (pivot at base, gentle sway).
+    this.kelp = [];
+    const kelpTex = makeKelpTexture('#1f6e4e');
+    const kelpTexDk = makeKelpTexture('#175a45');
+    const kelpLayout = [
+      [-2.15, 2.0, 0, 1.0], [-2.9, 1.7, 1, 1.3], [-3.7, 2.1, 0, 0.7],
+      [2.15, 2.0, 1, 1.1], [2.9, 1.7, 0, 1.4], [3.7, 2.1, 1, 0.6],
+    ];
+    for (const [x, hgt, dk, sway] of kelpLayout) {
+      const geo = new THREE.PlaneGeometry(hgt * 0.34, hgt);
+      geo.translate(0, hgt / 2, 0); // pivot at base
+      const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+        map: dk ? kelpTexDk : kelpTex, transparent: true, depthWrite: false, opacity: 0.55 }));
+      m.position.set(x, 0.15, -4.3);
+      this.scene.add(m);
+      this.kelp.push({ mesh: m, phase: x, sway: sway * 0.1 });
+    }
+
+    // Distant drifting fish silhouettes (very faint, far back).
+    this.distFish = [];
+    const dgeo = buildFishGeometry();
+    for (let i = 0; i < 6; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0x0e4a72, transparent: true, opacity: 0.14, depthWrite: false });
+      const m = new THREE.Mesh(dgeo, mat);
+      const dir = i % 2 ? 1 : -1;
+      m.position.set((Math.random() - 0.5) * 22, 3 + Math.random() * (H - 4), -4.4);
+      m.scale.setScalar(0.6 + Math.random() * 0.35);
+      m.rotation.z = dir > 0 ? Math.PI / 2 : -Math.PI / 2; // point sideways along travel
+      this.scene.add(m);
+      this.distFish.push({ mesh: m, dir, spd: 0.25 + Math.random() * 0.25, phase: Math.random() * 6 });
+    }
+  }
+
+  // Ambient menu fish: colorful fish (and opposite-color "friend" pairs) drifting
+  // up from the bottom behind the menus. Shown only when not in an active level.
+  _buildAmbientFish() {
+    this.ambientFish = [];
+    this.ambientVisible = false;
+    const geo = buildFishGeometry();
+    const baseColors = [0x2f7be6, 0xf08a2a, 0xe23b3b, 0x35b84a, 0xf4d21e, 0x9a4fd0];
+    const pairs = [[0x2f7be6, 0xf08a2a], [0xe23b3b, 0x35b84a], [0xf4d21e, 0x9a4fd0]];
+    const mk = (hex) => {
+      const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
+        color: hex, transparent: true, opacity: 0.9, side: THREE.DoubleSide }));
+      m.visible = false; m.renderOrder = 0;
+      this.scene.add(m);
+      return m;
+    };
+    // Nine singles + three friend-pairs (12 slots).
+    for (let i = 0; i < 9; i++) {
+      const hex = baseColors[i % baseColors.length];
+      this.ambientFish.push(this._newAmbient(mk(hex), null));
+    }
+    for (let i = 0; i < 3; i++) {
+      const [a, b] = pairs[i];
+      const fa = this._newAmbient(mk(a), null);
+      const fb = this._newAmbient(mk(b), null);
+      fb.partner = fa; fa.partner = fb; fa.lead = true;
+      this.ambientFish.push(fa, fb);
+    }
+    for (const f of this.ambientFish) this._respawnAmbient(f, true);
+  }
+
+  _newAmbient(mesh) {
+    return { mesh, x: 0, y: 0, z: -2.6, spd: 1, sway: 0, phase: 0, scale: 0.7, partner: null, lead: false };
+  }
+  _respawnAmbient(f, initial) {
+    if (f.partner && !f.lead) return; // followers are placed relative to their lead
+    f.x = (Math.random() - 0.5) * (this.W ? this.W * 1.1 : 6);
+    f.y = initial ? Math.random() * H : -0.8 - Math.random() * 1.5;
+    f.z = -2.2 - Math.random() * 1.4;
+    f.spd = 0.7 + Math.random() * 0.7;
+    f.sway = 0.3 + Math.random() * 0.5;
+    f.phase = Math.random() * 6.28;
+    f.scale = 0.55 + Math.random() * 0.4;
+    if (f.partner) { f.partner.z = f.z; f.partner.spd = f.spd; f.partner.scale = f.scale; }
+  }
+
+  setAmbientVisible(v) {
+    if (this.ambientVisible === v) return;
+    this.ambientVisible = v;
+    for (const f of this.ambientFish) f.mesh.visible = v;
+  }
+
+  _updateAmbientFish(dt) {
+    if (!this.ambientVisible) return;
+    for (const f of this.ambientFish) {
+      if (f.partner && !f.lead) continue; // moved by its lead
+      f.y += f.spd * dt;
+      const sx = Math.sin(this.time * 1.3 + f.phase) * f.sway * 0.35;
+      const m = f.mesh;
+      m.position.set(f.x + sx, f.y, f.z);
+      m.scale.setScalar(f.scale);
+      m.rotation.z = Math.sin(this.time * 1.3 + f.phase) * 0.12; // gentle waggle, nose up
+      if (f.partner) {
+        const p = f.partner.mesh;
+        p.position.set(f.x + sx + f.scale * 0.62, f.y - f.scale * 0.05, f.z);
+        p.scale.setScalar(f.scale);
+        p.rotation.z = m.rotation.z;
+      }
+      if (f.y > H + 1) this._respawnAmbient(f, false);
+    }
+  }
+
   _buildFishMesh() {
     this.atlas = buildPatternAtlas();
     const geo = buildFishGeometry();
@@ -831,6 +1149,30 @@ export class Render3D {
     }
     this.bubbles.geometry.attributes.position.needsUpdate = true;
     for (const r of this.rays) r.material.opacity = 0.05 + 0.02 * Math.sin(this.time * 0.5 + r.position.x);
+
+    // shoreline tide + wavelets
+    if (this.shoreMat) this.shoreMat.uniforms.uTime.value = this.time;
+    // beach decor: a barely-there settle so shells feel resting, not frozen
+    if (this.beachDecor) {
+      for (const d of this.beachDecor) d.mesh.rotation.z = d.baseRot + Math.sin(this.time * 0.6 + d.phase) * 0.02;
+    }
+    // swaying kelp
+    if (this.kelp) {
+      for (const k of this.kelp) k.mesh.rotation.z = Math.sin(this.time * 0.7 + k.phase) * k.sway;
+    }
+    // distant drifting silhouettes
+    if (this.distFish) {
+      const halfW = (this.W || 6) * 0.5 + 3;
+      for (const d of this.distFish) {
+        d.mesh.position.x += d.dir * d.spd * dt;
+        d.mesh.position.y += Math.sin(this.time * 0.4 + d.phase) * dt * 0.15;
+        if (d.mesh.position.x > halfW) d.mesh.position.x = -halfW;
+        else if (d.mesh.position.x < -halfW) d.mesh.position.x = halfW;
+      }
+    }
+    // ambient menu fish (only on non-gameplay screens)
+    this.setAmbientVisible(!sim);
+    this._updateAmbientFish(dt);
 
     // advance swimoffs
     for (const so of this.swimoffs) {

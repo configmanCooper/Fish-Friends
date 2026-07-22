@@ -2,6 +2,19 @@
 
 All notable changes to Fish Friends.
 
+## [1.34.0] — 2026-07-13
+- **Livelier beach & ocean.** The shoreline now has an animated foam waterline
+  that washes up and down the sand (tide + wavelets) with a wet-sand sheen, and
+  the beach is dotted with varied shells, starfish, spiral conches and pebbles.
+- **Subtle ocean ambience.** Gentle swaying kelp in the bottom corners and a few
+  very faint, slow-drifting distant fish silhouettes far in the background — kept
+  low-contrast and slow so they never distract from play.
+- **Living title screen.** Colorful fish (and opposite-color "friend" pairs) now
+  drift up from the bottom behind the menus, and the fish emoji beside the title
+  is replaced by two little game-style fish of opposite colors chasing each other
+  in a tight circle — a blue/orange pair on the left and a red/green pair on the
+  right.
+
 ## [1.33.1] — 2026-07-09
 - **Boss-clear bonus.** After beating a boss, a celebration menu now rewards
   clean runs: **+6 starfish** and a "Fantastic Achievement!" if you spent **no**

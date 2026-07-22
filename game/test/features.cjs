@@ -61,7 +61,7 @@ function assert(c, m) { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) failur
     for (let i = 0; i < 60; i++) { g.sim.tick(1/60); g.sim.drainEvents(); }
     g.sim.useSquid();
     for (let i = 0; i < 30; i++) { g.sim.tick(1/60); g.sim.drainEvents(); g.render.update(0.016, g.sim); }
-    return { visible: g.render.squidMesh.visible };
+    return { visible: g.render.squidGroup.visible };
   });
   assert(squid.visible === true, 'squid/octopus mesh visible when active');
   await page.screenshot({ path: 'squid.png' });
