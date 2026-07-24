@@ -2,6 +2,12 @@
 
 All notable changes to Fish Friends.
 
+## [1.34.5] — 2026-07-24
+- **Update notice on the installed app.** When you open the Android app, it now
+  asks Google Play whether a newer version is available and, if so, shows a
+  dismissible banner with an "Update" button that takes you to the store. Has no
+  effect on the web version.
+
 ## [1.34.4] — 2026-07-22
 - **Shoreline no longer bleeds into the ocean.** Clamped the shallow-water and
   foam shimmer to fade out exactly at the sand's top edge, so the effect stays

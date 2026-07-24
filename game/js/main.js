@@ -59,8 +59,45 @@ class Game {
     window.addEventListener('keydown', (e) => this._cheatKey(e));
     this._setupInstallPrompt();
     this._setupBackTrap();
+    this._checkForAppUpdate();
 
     requestAnimationFrame((t) => this._loop(t));
+  }
+
+  // ---- Native Play Store update check ------------------------------------
+  // On the installed Android app, ask Google Play whether a newer version is
+  // available and, if so, surface a dismissible "Update" banner that opens the
+  // store. Uses the @capawesome/capacitor-app-update native plugin via the
+  // Capacitor bridge's low-level nativePromise() (no bundler needed). Silently
+  // no-ops on web/desktop and when the app wasn't installed from Play.
+  _checkForAppUpdate() {
+    try {
+      const cap = window.Capacitor;
+      if (!cap || typeof cap.isNativePlatform !== 'function' || !cap.isNativePlatform()) return;
+      if (typeof cap.getPlatform === 'function' && cap.getPlatform() !== 'android') return;
+      if (typeof cap.nativePromise !== 'function') return;
+      cap.nativePromise('AppUpdate', 'getAppUpdateInfo', {})
+        .then((info) => {
+          // AppUpdateAvailability.UPDATE_AVAILABLE === 2
+          const code = info && info.updateAvailability;
+          if (code === 2 || code === '2') this.ui.showUpdateBanner();
+        })
+        .catch(() => { /* not from Play, offline, or unsupported — ignore */ });
+    } catch (e) { /* ignore */ }
+  }
+
+  // Open the Play Store listing so the user can install the update.
+  openAppUpdate() {
+    const cap = window.Capacitor;
+    try {
+      if (cap && typeof cap.nativePromise === 'function') {
+        cap.nativePromise('AppUpdate', 'openAppStore', {}).catch(() => {
+          window.open('https://play.google.com/store/apps/details?id=com.configmancooper.fishfriends', '_blank');
+        });
+        return;
+      }
+    } catch (e) { /* fall through */ }
+    window.open('https://play.google.com/store/apps/details?id=com.configmancooper.fishfriends', '_blank');
   }
 
   // ---- PWA install prompt (Android/desktop Chrome) -----------------------

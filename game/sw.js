@@ -2,7 +2,7 @@
 // Online: always fetch the freshest bytes from the network (so every open acts
 // like a hard refresh and picks up the latest deploy) and update the cache.
 // Offline: fall back to the cached copy so you can still play what you played.
-const CACHE = 'fishfriends-v56';
+const CACHE = 'fishfriends-v57';
 const ASSETS = [
   './',
   './index.html',
@@ -10,8 +10,8 @@ const ASSETS = [
   './favicon.png',
   './icon-192.png',
   './icon-512.png',
-  './css/style.css?v=56',
-  './js/main.js?v=56',
+  './css/style.css?v=57',
+  './js/main.js?v=57',
   './assets/FishFriendsSong.mp3?v=1',
   './js/config.js', './js/rng.js', './js/levels.js', './js/sim.js',
   './js/render3d.js', './js/fish_models.js', './js/fx.js',

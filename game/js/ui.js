@@ -295,6 +295,12 @@ export class UI {
           <button class="btn btn-primary" data-action="close-help">Got it</button>
         </div>
       </div>
+      <div id="update-banner" class="update-banner" style="display:none">
+        <span class="update-icon">🐟</span>
+        <span class="update-text">A new version of Fish Friends is available!</span>
+        <button class="update-btn" data-action="update-open">Update</button>
+        <button class="update-x" data-action="update-hide" aria-label="Dismiss">✕</button>
+      </div>
       <div id="toast"></div>
     `;
   }
@@ -320,6 +326,8 @@ export class UI {
     switch (a) {
       case 'play': g.goToMap(); break;
       case 'install': g.promptInstall(); break;
+      case 'update-open': g.openAppUpdate(); break;
+      case 'update-hide': this.hideUpdateBanner(); break;
       case 'title': g.goToTitle(); break;
       case 'deep': g.startDeep(); break;
       case 'legacy': g.openLegacy(); break;
@@ -670,6 +678,22 @@ export class UI {
     t.classList.add('show');
     clearTimeout(this._toastT);
     this._toastT = setTimeout(() => t.classList.remove('show'), 1400);
+  }
+
+  // ---- App-update banner (native Android / Play Store) -------------------
+  showUpdateBanner() {
+    const b = document.getElementById('update-banner');
+    if (!b) return;
+    b.style.display = '';
+    // next frame so the slide-in transition runs
+    requestAnimationFrame(() => b.classList.add('show'));
+  }
+
+  hideUpdateBanner() {
+    const b = document.getElementById('update-banner');
+    if (!b) return;
+    b.classList.remove('show');
+    setTimeout(() => { b.style.display = 'none'; }, 300);
   }
 
   // ---- Results -----------------------------------------------------------
